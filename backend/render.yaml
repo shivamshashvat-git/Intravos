@@ -1,0 +1,22 @@
+services:
+  - type: web
+    name: intravos-backend
+    env: docker
+    plan: starter
+    region: singapore # Standard region for target market (India/SEA)
+    dockerContext: .
+    dockerfilePath: Dockerfile
+    healthCheckPath: /health
+    envVars:
+      - key: SUPABASE_URL
+        sync: false # User must set in Render dashboard
+      - key: SUPABASE_SERVICE_ROLE_KEY
+        sync: false # User must set in Render dashboard
+      - key: SENTRY_DSN
+        sync: false # Optional
+      - key: REDIS_URL
+        sync: false # For rate limiting, optional
+      - key: NODE_ENV
+        value: production
+      - key: PORT
+        value: 3000

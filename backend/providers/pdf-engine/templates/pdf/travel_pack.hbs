@@ -1,0 +1,107 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <style>:root { --primary-color: {{branding.primary_color}}; --secondary-color: {{branding.secondary_color}}; }</style>
+  <style>{{{baseCSS}}}</style>
+</head>
+<body>
+
+  <!-- HEADER -->
+  <div class="pdf-header">
+    <div class="pdf-header-logo">
+      {{#if branding.logo_url}}<img src="{{branding.logo_url}}" alt="{{branding.agency_name}}">{{/if}}
+      <div><div class="pdf-header-agency-name">{{branding.agency_name}}</div></div>
+    </div>
+    <div class="pdf-header-agency-details">
+      {{#if branding.agency_address}}<div>{{branding.agency_address}}</div>{{/if}}
+      {{#if branding.agency_phone}}<div>📞 {{branding.agency_phone}}</div>{{/if}}
+      {{#if branding.agency_email}}<div>✉ {{branding.agency_email}}</div>{{/if}}
+    </div>
+  </div>
+
+  <!-- TITLE -->
+  <div class="pdf-title">Client Travel Pack</div>
+  <div class="pdf-subtitle">Booking Ref: {{booking_ref}} · {{formatDate travel_start_date}} – {{formatDate travel_end_date}}</div>
+
+  <!-- TRIP SUMMARY -->
+  <div class="pdf-section">
+    <div class="pdf-section-title">Trip Summary</div>
+    <div class="info-grid">
+      <div>
+        <div class="info-row"><span class="info-label">Booking Ref</span><span class="info-value" style="font-weight:600;">{{booking_ref}}</span></div>
+        {{#if destination}}<div class="info-row"><span class="info-label">Destination</span><span class="info-value">{{destination}}</span></div>{{/if}}
+      </div>
+      <div>
+        <div class="info-row"><span class="info-label">Travel Dates</span><span class="info-value">{{formatDate travel_start_date}} – {{formatDate travel_end_date}}</span></div>
+        <div class="info-row"><span class="info-label">Traveller Count</span><span class="info-value">{{defaultVal traveler_count 1}}</span></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- INCLUDED SERVICES -->
+  {{#if services}}
+  <div class="pdf-section">
+    <div class="pdf-section-title">Included Services</div>
+    <table class="pdf-table">
+      <thead>
+        <tr>
+          <th style="width:40px;">#</th>
+          <th>Service</th>
+          <th>Type</th>
+          <th>Dates</th>
+          <th>Confirmation</th>
+        </tr>
+      </thead>
+      <tbody>
+        {{#each services}}
+        <tr>
+          <td>{{inc @index}}</td>
+          <td style="font-weight:500;">{{this.service_title}}</td>
+          <td>{{uppercase this.service_type}}</td>
+          <td>{{formatDate this.service_start_date}} – {{formatDate this.service_end_date}}</td>
+          <td>{{defaultVal this.confirmation_number "Pending"}}</td>
+        </tr>
+        {{/each}}
+      </tbody>
+    </table>
+  </div>
+  {{/if}}
+
+  <!-- INSURANCE -->
+  {{#if insurance}}
+  <div class="pdf-section">
+    <div class="pdf-section-title">Travel Insurance</div>
+    {{#each insurance}}
+    <div class="info-grid mb-10">
+      <div>
+        <div class="info-row"><span class="info-label">Provider</span><span class="info-value">{{this.provider}}</span></div>
+        <div class="info-row"><span class="info-label">Policy No.</span><span class="info-value">{{this.policy_number}}</span></div>
+      </div>
+      <div>
+        <div class="info-row"><span class="info-label">Coverage</span><span class="info-value">{{formatDate this.start_date}} – {{formatDate this.end_date}}</span></div>
+      </div>
+    </div>
+    {{/each}}
+  </div>
+  {{else}}
+  <div class="terms-box">
+    <h4>Travel Insurance</h4>
+    <p>No travel insurance policy linked yet. We recommend obtaining travel insurance before departure.</p>
+  </div>
+  {{/if}}
+
+  <!-- EMERGENCY CONTACTS -->
+  <div class="terms-box mt-20">
+    <h4>Emergency Contact</h4>
+    <p>For any assistance during your trip, please contact {{branding.agency_name}} at {{branding.agency_phone}}{{#if branding.agency_email}} or {{branding.agency_email}}{{/if}}.</p>
+  </div>
+
+  <!-- FOOTER -->
+  <div class="pdf-footer">
+    <p>Have a wonderful trip! · {{branding.agency_name}}</p>
+    <p>Generated on {{generated_at}}</p>
+  </div>
+
+</body>
+</html>

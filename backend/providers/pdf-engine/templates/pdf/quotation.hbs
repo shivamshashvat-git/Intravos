@@ -1,0 +1,128 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <style>:root { --primary-color: {{branding.primary_color}}; --secondary-color: {{branding.secondary_color}}; }</style>
+  <style>{{{baseCSS}}}</style>
+</head>
+<body>
+
+  <!-- HEADER -->
+  <div class="pdf-header">
+    <div class="pdf-header-logo">
+      {{#if branding.logo_url}}<img src="{{branding.logo_url}}" alt="{{branding.agency_name}}">{{/if}}
+      <div>
+        <div class="pdf-header-agency-name">{{branding.agency_name}}</div>
+        {{#if branding.gstin}}<div style="font-size:9.5px;color:var(--text-muted);font-weight:600;">GSTIN: {{branding.gstin}}</div>{{/if}}
+      </div>
+    </div>
+    <div class="pdf-header-agency-details">
+      {{#if branding.agency_address}}<div>{{branding.agency_address}}</div>{{/if}}
+      {{#if branding.agency_phone}}<div>📞 {{branding.agency_phone}}</div>{{/if}}
+      {{#if branding.agency_email}}<div>✉ {{branding.agency_email}}</div>{{/if}}
+    </div>
+  </div>
+
+  <!-- TITLE BLOCK -->
+  <div class="pdf-title-block">
+    <div>
+      <div class="pdf-title">Trip Quotation</div>
+      <div class="pdf-subtitle"># {{defaultVal quote_number "Draft"}}{{#if valid_until}} · Valid until {{formatDate valid_until}}{{/if}}</div>
+    </div>
+    <div style="text-align: right;">
+      <div style="font-size: 10px; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.5px;">Estimated Total</div>
+      <div style="font-size: 20px; font-weight: 700; color: var(--primary-color);" class="mono">{{formatCurrency total}}</div>
+    </div>
+  </div>
+
+  <!-- CUSTOMER & TRIP INFO -->
+  <div class="pdf-section">
+    <div class="info-grid">
+      <div>
+        <div class="pdf-section-title">Client Information</div>
+        <div class="info-row"><span class="info-label">Prepared For</span><span class="info-value" style="font-weight:700;">{{customer_name}}</span></div>
+        {{#if customer_phone}}<div class="info-row"><span class="info-label">Phone</span><span class="info-value">{{customer_phone}}</span></div>{{/if}}
+        {{#if customer_email}}<div class="info-row"><span class="info-label">Email</span><span class="info-value">{{customer_email}}</span></div>{{/if}}
+      </div>
+      <div>
+        <div class="pdf-section-title">Trip Summary</div>
+        {{#if destination}}<div class="info-row"><span class="info-label">Destination</span><span class="info-value">{{destination}}</span></div>{{/if}}
+        {{#if start_date}}<div class="info-row"><span class="info-label">Travel Dates</span><span class="info-value">{{formatDate start_date}} – {{formatDate end_date}}</span></div>{{/if}}
+        {{#if guests}}<div class="info-row"><span class="info-label">Guests / Rooms</span><span class="info-value">{{guests}} guest(s), {{defaultVal rooms 1}} room(s)</span></div>{{/if}}
+      </div>
+    </div>
+  </div>
+
+  <!-- LINE ITEMS TABLE -->
+  <div class="pdf-section">
+    <div class="pdf-section-title">Package Inclusions & Pricing</div>
+    <div class="pdf-table-container">
+      <table class="pdf-table">
+        <thead>
+          <tr>
+            <th style="width:40px;">#</th>
+            <th>Description</th>
+            <th class="text-right">Taxable</th>
+            <th class="text-right">GST %</th>
+            <th style="width:120px;" class="text-right">Total Price</th>
+          </tr>
+        </thead>
+        <tbody>
+          {{#each quotation_items}}
+          <tr>
+            <td>{{inc @index}}</td>
+            <td style="font-weight:600;">{{this.description}}</td>
+            <td class="text-right mono">{{formatCurrency this.amount}}</td>
+            <td class="text-right">{{this.gst_rate}}%</td>
+            <td class="text-right mono" style="font-weight:700;">{{formatCurrency this.total}}</td>
+          </tr>
+          {{/each}}
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+  <!-- TOTALS -->
+  <div class="totals-container">
+    <div class="totals-box">
+      <div class="totals-row"><span>Subtotal (Excl. Tax)</span><span class="mono">{{formatCurrency subtotal}}</span></div>
+      {{#if (eq gst_type "cgst_sgst")}}
+        <div class="totals-row"><span>Central Tax (CGST)</span><span class="mono">{{formatCurrency cgst}}</span></div>
+        <div class="totals-row"><span>State Tax (SGST)</span><span class="mono">{{formatCurrency sgst}}</span></div>
+      {{else}}
+        <div class="totals-row"><span>Integrated Tax (IGST)</span><span class="mono">{{formatCurrency igst}}</span></div>
+      {{/if}}
+      <div class="totals-row grand-total"><span>Total Package Price</span><span class="mono">{{formatCurrency total}}</span></div>
+    </div>
+  </div>
+
+  <!-- INCLUSIONS / EXCLUSIONS -->
+  {{#if inclusions}}
+  <div class="terms-box">
+    <h4>What's Included</h4>
+    <p style="white-space: pre-wrap;">{{inclusions}}</p>
+  </div>
+  {{/if}}
+
+  {{#if exclusions}}
+  <div class="terms-box">
+    <h4>What's Not Included</h4>
+    <p style="white-space: pre-wrap;">{{exclusions}}</p>
+  </div>
+  {{/if}}
+
+  {{#if terms}}
+  <div class="terms-box" style="background: #fdfdfd;">
+    <h4>Important Terms & Conditions</h4>
+    <p style="white-space: pre-wrap;">{{terms}}</p>
+  </div>
+  {{/if}}
+
+  <!-- FOOTER -->
+  <div class="pdf-footer">
+    <p>Prices are subject to change based on actual availability at the time of booking.</p>
+    <p>© {{branding.agency_name}} · Generated on {{generated_at}}</p>
+  </div>
+
+</body>
+</html>

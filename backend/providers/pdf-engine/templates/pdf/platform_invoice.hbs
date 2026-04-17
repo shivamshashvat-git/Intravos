@@ -1,0 +1,116 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="utf-8">
+    <style>
+        {{baseCSS}}
+        .platform-invoice-header {
+            display: flex;
+            justify-content: space-between;
+            border-bottom: 2px solid #1A365D;
+            padding-bottom: 20px;
+            margin-bottom: 30px;
+        }
+        .intravos-logo {
+            font-size: 28px;
+            font-weight: bold;
+            color: #1A365D;
+            letter-spacing: -1px;
+        }
+        .status-badge {
+            display: inline-block;
+            padding: 4px 12px;
+            border-radius: 4px;
+            font-size: 12px;
+            font-weight: bold;
+            text-transform: uppercase;
+        }
+        .status-unpaid { background: #FFF5F5; color: #C53030; }
+        .status-paid { background: #F0FFF4; color: #2F855A; }
+    </style>
+</head>
+<body>
+    <div class="platform-invoice-header">
+        <div>
+            <div class="intravos-logo">INTRAVOS</div>
+            <div class="text-muted" style="font-size: 12px; margin-top: 5px;">The Travel Operating System</div>
+        </div>
+        <div style="text-align: right;">
+            <h1 style="margin: 0; color: #1A365D;">TAX INVOICE</h1>
+            <div style="font-weight: bold; margin-top: 10px;"># {{invoice_number}}</div>
+        </div>
+    </div>
+
+    <div style="display: flex; justify-content: space-between; margin-bottom: 40px;">
+        <div style="width: 45%;">
+            <div class="section-title">BILL FROM</div>
+            <div style="font-weight: bold;">Intravos Technologies Pvt Ltd</div>
+            <div>Plot 45, Hitech City, Hyderabad</div>
+            <div>Telangana, India - 500081</div>
+            <div>GSTIN: 36AAACI1234A1Z1</div>
+            <div>Email: billing@intravos.com</div>
+        </div>
+        <div style="width: 45%; text-align: right;">
+            <div class="section-title">BILL TO</div>
+            <div style="font-weight: bold;">{{tenants.name}}</div>
+            <div>Agency ID: {{tenant_id}}</div>
+            <div>Date: {{formatDate created_at}}</div>
+            <div>Due Date: {{formatDate due_date}}</div>
+            <div class="status-badge status-{{status}}">{{status}}</div>
+        </div>
+    </div>
+
+    <table class="table" style="margin-bottom: 30px;">
+        <thead>
+            <tr>
+                <th>Description</th>
+                <th style="text-align: right;">Amount</th>
+            </tr>
+        </thead>
+        <tbody>
+            <tr>
+                <td>
+                    <strong>Intravos SaaS Subscription</strong><br>
+                    <small>Annual subscription for {{tenants.name}}</small>
+                </td>
+                <td style="text-align: right;">{{formatCurrency base_amount}}</td>
+            </tr>
+        </tbody>
+    </table>
+
+    <div style="display: flex; justify-content: flex-end;">
+        <div style="width: 300px;">
+            <div style="display: flex; justify-content: space-between; padding: 5px 0;">
+                <span>Subtotal</span>
+                <span>{{formatCurrency base_amount}}</span>
+            </div>
+            <div style="display: flex; justify-content: space-between; padding: 5px 0; border-bottom: 1px solid #EEE;">
+                <span>GST (18%)</span>
+                <span>{{formatCurrency tax_amount}}</span>
+            </div>
+            <div style="display: flex; justify-content: space-between; padding: 10px 0; font-size: 18px; font-weight: bold; color: #1A365D;">
+                <span>Total Amount</span>
+                <span>{{formatCurrency total_amount}}</span>
+            </div>
+        </div>
+    </div>
+
+    <div style="margin-top: 50px; padding: 20px; background: #F7FAFC; border-radius: 8px; font-size: 12px;">
+        <div style="font-weight: bold; margin-bottom: 10px;">PAYMENT INSTRUCTIONS</div>
+        <div>Please wire the total amount to:</div>
+        <div style="margin-top: 5px;">
+            Bank Name: HDFC Bank<br>
+            Account Name: Intravos Technologies Pvt Ltd<br>
+            A/C Number: 50200012345678<br>
+            IFSC: HDFC0001234
+        </div>
+        <div style="margin-top: 15px; color: #718096;">
+            * Please mention Invoice Number <strong>{{invoice_number}}</strong> in your payment remarks for faster reconciliation.
+        </div>
+    </div>
+
+    <div style="margin-top: 40px; text-align: center; color: #A0AEC0; font-size: 11px;">
+        This is a computer generated invoice and does not require a physical signature.
+    </div>
+</body>
+</html>

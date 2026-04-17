@@ -1,0 +1,149 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <style>:root { --primary-color: {{branding.primary_color}}; --secondary-color: {{branding.secondary_color}}; }</style>
+  <style>{{{baseCSS}}}</style>
+</head>
+<body>
+
+  <!-- HEADER -->
+  <div class="pdf-header">
+    <div class="pdf-header-logo">
+      {{#if branding.logo_url}}
+        <img src="{{branding.logo_url}}" alt="{{branding.agency_name}}">
+      {{/if}}
+      <div>
+        <div class="pdf-header-agency-name">{{branding.agency_name}}</div>
+        {{#if branding.gstin}}<div style="font-size:9.5px;color:var(--text-muted);font-weight:600;">GSTIN: {{branding.gstin}}</div>{{/if}}
+      </div>
+    </div>
+    <div class="pdf-header-agency-details">
+      {{#if branding.agency_address}}<div>{{branding.agency_address}}</div>{{/if}}
+      {{#if branding.agency_phone}}<div>📞 {{branding.agency_phone}}</div>{{/if}}
+      {{#if branding.agency_email}}<div>✉ {{branding.agency_email}}</div>{{/if}}
+      {{#if branding.agency_website}}<div>🌐 {{branding.agency_website}}</div>{{/if}}
+    </div>
+  </div>
+
+  <!-- TITLE BLOCK -->
+  <div class="pdf-title-block">
+    <div>
+      <div class="pdf-title">{{#if (eq invoice_type "credit_note")}}Credit Note{{else}}Tax Invoice{{/if}}</div>
+      <div class="pdf-subtitle"># {{invoice_number}}</div>
+    </div>
+    <div style="text-align: right;">
+      <div style="font-size: 10px; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.5px;">Status</div>
+      <div style="margin-top: 4px;">
+        <span class="badge {{#if (eq status 'paid')}}badge-paid{{else if (eq status 'overdue')}}badge-overdue{{else}}badge-pending{{/if}}">
+          {{uppercase status}}
+        </span>
+      </div>
+    </div>
+  </div>
+
+  <!-- INVOICE META -->
+  <div class="pdf-section">
+    <div class="info-grid">
+      <div>
+        <div class="pdf-section-title">Invoice Details</div>
+        <div class="info-row"><span class="info-label">Invoice Date</span><span class="info-value">{{formatDate created_at}}</span></div>
+        {{#if due_date}}<div class="info-row"><span class="info-label">Due Date</span><span class="info-value">{{formatDate due_date}}</span></div>{{/if}}
+        {{#if financial_year}}<div class="info-row"><span class="info-label">Financial Year</span><span class="info-value">{{financial_year}}</span></div>{{/if}}
+      </div>
+      <div>
+        <div class="pdf-section-title">Bill To</div>
+        <div class="info-row"><span class="info-label">Client Name</span><span class="info-value" style="font-weight:700;">{{customer_name}}</span></div>
+        {{#if customer_phone}}<div class="info-row"><span class="info-label">Phone</span><span class="info-value">{{customer_phone}}</span></div>{{/if}}
+        {{#if customer_gstin}}<div class="info-row"><span class="info-label">GSTIN</span><span class="info-value">{{customer_gstin}}</span></div>{{/if}}
+        {{#if place_of_supply}}<div class="info-row"><span class="info-label">Place of Supply</span><span class="info-value">{{place_of_supply}}</span></div>{{/if}}
+      </div>
+    </div>
+  </div>
+
+  <!-- LINE ITEMS TABLE -->
+  <div class="pdf-section">
+    <div class="pdf-section-title">Service Summary</div>
+    <div class="pdf-table-container">
+      <table class="pdf-table">
+        <thead>
+          <tr>
+            <th style="width:40px;">#</th>
+            <th>Description</th>
+            <th style="width:80px;">HSN/SAC</th>
+            <th class="text-right">Rate</th>
+            <th class="text-right">GST %</th>
+            {{#if (eq gst_type "cgst_sgst")}}
+              <th class="text-right">CGST</th>
+              <th class="text-right">SGST</th>
+            {{else}}
+              <th class="text-right">IGST</th>
+            {{/if}}
+            <th style="width:110px;" class="text-right">Amount</th>
+          </tr>
+        </thead>
+        <tbody>
+          {{#each invoice_items}}
+          <tr>
+            <td>{{inc @index}}</td>
+            <td style="font-weight:600;">{{this.description}}</td>
+            <td>{{defaultVal this.sac_code "998551"}}</td>
+            <td class="text-right mono">{{formatCurrency this.amount}}</td>
+            <td class="text-right">{{this.gst_rate}}%</td>
+            {{#if (eq ../gst_type "cgst_sgst")}}
+              <td class="text-right mono">{{formatCurrency this.cgst}}</td>
+              <td class="text-right mono">{{formatCurrency this.sgst}}</td>
+            {{else}}
+              <td class="text-right mono">{{formatCurrency this.igst}}</td>
+            {{/if}}
+            <td class="text-right mono" style="font-weight:700;">{{formatCurrency this.total}}</td>
+          </tr>
+          {{/each}}
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+  <!-- TOTALS -->
+  <div class="totals-container">
+    <div class="totals-box">
+      <div class="totals-row"><span>Taxable Amount</span><span class="mono">{{formatCurrency subtotal}}</span></div>
+      {{#if (eq gst_type "cgst_sgst")}}
+        <div class="totals-row"><span>Central Tax (CGST)</span><span class="mono">{{formatCurrency cgst}}</span></div>
+        <div class="totals-row"><span>State Tax (SGST)</span><span class="mono">{{formatCurrency sgst}}</span></div>
+      {{else}}
+        <div class="totals-row"><span>Integrated Tax (IGST)</span><span class="mono">{{formatCurrency igst}}</span></div>
+      {{/if}}
+      <div class="totals-row grand-total"><span>Total Invoice Value</span><span class="mono">{{formatCurrency total}}</span></div>
+      
+      {{#if amount_paid}}
+        <div class="totals-row" style="color:#38a169;"><span>Amount Received</span><span class="mono">{{formatCurrency amount_paid}}</span></div>
+        <div class="totals-row" style="color:#e53e3e;font-weight:700;border-top:1px solid var(--border-color);margin-top:5px;padding-top:5px;">
+          <span>Balance Due</span><span class="mono">{{formatCurrency amount_due}}</span>
+        </div>
+      {{/if}}
+    </div>
+  </div>
+
+  <!-- BANK DETAILS / PAYMENT TERMS -->
+  {{#if (or payment_terms bank_text)}}
+  <div class="terms-box">
+    {{#if bank_text}}
+      <h4>Bank Transfer Information</h4>
+      <p style="white-space: pre-wrap; font-family: monospace; font-size: 11px;">{{bank_text}}</p>
+    {{/if}}
+    {{#if payment_terms}}
+      <h4 style="margin-top:12px;">Payment Terms & Notes</h4>
+      <p>{{payment_terms}}</p>
+    {{/if}}
+  </div>
+  {{/if}}
+
+  <!-- FOOTER -->
+  <div class="pdf-footer">
+    <p>This is a computer-generated tax invoice and does not require a physical signature.</p>
+    <p>© {{branding.agency_name}} · {{#if branding.agency_website}}{{branding.agency_website}}{{/if}}</p>
+  </div>
+
+</body>
+</html>

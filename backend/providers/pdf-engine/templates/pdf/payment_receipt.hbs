@@ -1,0 +1,65 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <style>:root { --primary-color: {{branding.primary_color}}; --secondary-color: {{branding.secondary_color}}; }</style>
+  <style>{{{baseCSS}}}</style>
+</head>
+<body>
+
+  <!-- HEADER -->
+  <div class="pdf-header">
+    <div class="pdf-header-logo">
+      {{#if branding.logo_url}}<img src="{{branding.logo_url}}" alt="{{branding.agency_name}}">{{/if}}
+      <div><div class="pdf-header-agency-name">{{branding.agency_name}}</div></div>
+    </div>
+    <div class="pdf-header-agency-details">
+      {{#if branding.agency_address}}<div>{{branding.agency_address}}</div>{{/if}}
+      {{#if branding.agency_phone}}<div>📞 {{branding.agency_phone}}</div>{{/if}}
+    </div>
+  </div>
+
+  <!-- TITLE -->
+  <div class="pdf-title">Payment Receipt</div>
+  <div class="pdf-subtitle">Receipt ID: {{id}}</div>
+
+  <!-- RECEIPT DETAILS -->
+  <div class="pdf-section">
+    <div class="pdf-section-title">Receipt Details</div>
+    <div class="info-grid">
+      <div>
+        <div class="info-row"><span class="info-label">Amount</span><span class="info-value" style="font-size:16px;font-weight:700;color:var(--primary-color);">{{formatCurrency amount}}</span></div>
+        <div class="info-row"><span class="info-label">Direction</span><span class="info-value">{{uppercase direction}}</span></div>
+        <div class="info-row"><span class="info-label">Payment Method</span><span class="info-value">{{defaultVal pay_method "N/A"}}</span></div>
+        <div class="info-row"><span class="info-label">Date</span><span class="info-value">{{formatDate transaction_date}}</span></div>
+      </div>
+      <div>
+        {{#if description}}<div class="info-row"><span class="info-label">Description</span><span class="info-value">{{description}}</span></div>{{/if}}
+        {{#if transaction_ref}}<div class="info-row"><span class="info-label">Reference</span><span class="info-value">{{transaction_ref}}</span></div>{{/if}}
+      </div>
+    </div>
+  </div>
+
+  <!-- LINKED RECORDS -->
+  <div class="pdf-section">
+    <div class="pdf-section-title">Linked Records</div>
+    <div class="info-grid">
+      <div>
+        {{#if leads.customer_name}}<div class="info-row"><span class="info-label">Customer</span><span class="info-value">{{leads.customer_name}}</span></div>{{/if}}
+        {{#if leads.destination}}<div class="info-row"><span class="info-label">Destination</span><span class="info-value">{{leads.destination}}</span></div>{{/if}}
+      </div>
+      <div>
+        {{#if invoices.invoice_number}}<div class="info-row"><span class="info-label">Invoice</span><span class="info-value">{{invoices.invoice_number}}</span></div>{{/if}}
+        {{#if bank_accounts.account_name}}<div class="info-row"><span class="info-label">Account</span><span class="info-value">{{bank_accounts.account_name}}{{#if bank_accounts.bank_name}} ({{bank_accounts.bank_name}}){{/if}}</span></div>{{/if}}
+      </div>
+    </div>
+  </div>
+
+  <!-- FOOTER -->
+  <div class="pdf-footer">
+    <p>This is a computer-generated receipt. No signature is required.</p>
+    <p>Generated on {{generated_at}} · {{branding.agency_name}}</p>
+  </div>
+
+</body>
+</html>

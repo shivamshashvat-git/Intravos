@@ -1,0 +1,303 @@
+/* ─── INTRAVOS PDF BASE STYLES ───────────────────────────────── */
+/* Injected into every PDF template via {{baseCSS}} */
+
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Outfit:wght@400;500;600;700&display=swap');
+
+:root {
+  --primary-color: #1A365D;
+  --secondary-color: #2B6CB0;
+  --text-main: #1a202c;
+  --text-muted: #718096;
+  --border-color: #e2e8f0;
+  --bg-light: #f7fafc;
+}
+
+* {
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+}
+
+body {
+  font-family: 'Inter', -apple-system, sans-serif;
+  font-size: 11px;
+  line-height: 1.5;
+  color: var(--text-main);
+  background: #ffffff;
+  padding: 0;
+}
+
+/* ─── HEADER ─────────────────────────────────────────────────── */
+.pdf-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  padding-bottom: 20px;
+  border-bottom: 2px solid var(--primary-color);
+  margin-bottom: 30px;
+}
+
+.pdf-header-logo {
+  display: flex;
+  align-items: center;
+  gap: 15px;
+}
+
+.pdf-header-logo img {
+  max-height: 55px;
+  max-width: 180px;
+  object-fit: contain;
+}
+
+.pdf-header-agency-name {
+  font-family: 'Outfit', sans-serif;
+  font-size: 20px;
+  font-weight: 700;
+  color: var(--primary-color);
+  line-height: 1.2;
+}
+
+.pdf-header-agency-details {
+  font-size: 9.5px;
+  color: var(--text-muted);
+  text-align: right;
+  line-height: 1.5;
+}
+
+/* ─── DOCUMENT TITLE ─────────────────────────────────────────── */
+.pdf-title-block {
+  margin-bottom: 30px;
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-end;
+}
+
+.pdf-title {
+  font-family: 'Outfit', sans-serif;
+  font-size: 26px;
+  font-weight: 700;
+  color: var(--primary-color);
+  letter-spacing: -0.5px;
+}
+
+.pdf-subtitle {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text-muted);
+}
+
+/* ─── SECTION ────────────────────────────────────────────────── */
+.pdf-section {
+  margin-bottom: 25px;
+}
+
+.pdf-section-title {
+  font-family: 'Outfit', sans-serif;
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--primary-color);
+  text-transform: uppercase;
+  letter-spacing: 1px;
+  padding-bottom: 8px;
+  border-bottom: 1px solid var(--border-color);
+  margin-bottom: 12px;
+}
+
+/* ─── INFO GRID ────────────────────────────────────────────── */
+.info-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 10px 40px;
+}
+
+.info-row {
+  display: flex;
+  border-bottom: 1px dashed #edf2f7;
+  padding: 4px 0;
+}
+
+.info-label {
+  font-size: 10px;
+  color: var(--text-muted);
+  font-weight: 500;
+  min-width: 120px;
+  text-transform: uppercase;
+  letter-spacing: 0.3px;
+}
+
+.info-value {
+  font-size: 11px;
+  color: var(--text-main);
+  font-weight: 600;
+}
+
+/* ─── TABLES ─────────────────────────────────────────────────── */
+.pdf-table-container {
+  border: 1px solid var(--border-color);
+  border-radius: 8px;
+  overflow: hidden;
+  margin-top: 10px;
+}
+
+.pdf-table {
+  width: 100%;
+  border-collapse: collapse;
+}
+
+.pdf-table thead th {
+  background: var(--primary-color);
+  color: #ffffff;
+  font-size: 9.5px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  padding: 12px 15px;
+  text-align: left;
+}
+
+.pdf-table thead th:last-child {
+  text-align: right;
+}
+
+.pdf-table tbody td {
+  padding: 12px 15px;
+  font-size: 10.5px;
+  border-bottom: 1px solid var(--border-color);
+  color: #2d3748;
+}
+
+.pdf-table tbody tr:last-child td {
+  border-bottom: none;
+}
+
+.pdf-table tbody td:last-child {
+  text-align: right;
+}
+
+.pdf-table tbody tr:nth-child(even) {
+  background: var(--bg-light);
+}
+
+/* ─── TOTALS BOX ─────────────────────────────────────────────── */
+.totals-container {
+  display: flex;
+  justify-content: flex-end;
+  margin-top: 15px;
+}
+
+.totals-box {
+  width: 260px;
+  background: var(--bg-light);
+  border: 1px solid var(--border-color);
+  border-radius: 8px;
+  padding: 15px;
+}
+
+.totals-row {
+  display: flex;
+  justify-content: space-between;
+  padding: 4px 0;
+  font-size: 11px;
+}
+
+.totals-row.grand-total {
+  font-family: 'Outfit', sans-serif;
+  font-size: 16px;
+  font-weight: 700;
+  color: var(--primary-color);
+  border-top: 2px solid var(--primary-color);
+  padding-top: 10px;
+  margin-top: 10px;
+}
+
+/* ─── BADGES ─────────────────────────────────────────────────── */
+.badge {
+  display: inline-block;
+  padding: 4px 10px;
+  border-radius: 6px;
+  font-size: 9px;
+  font-weight: 700;
+  text-transform: uppercase;
+}
+
+.badge-paid { background: #E6FFFA; color: #234E52; border: 1px solid #B2F5EA; }
+.badge-pending { background: #FFFBEB; color: #92400E; border: 1px solid #FEF3C7; }
+.badge-overdue { background: #FFF5F5; color: #C53030; border: 1px solid #FED7D7; }
+
+/* ─── TERMS / NOTES ──────────────────────────────────────────── */
+.terms-box {
+  background: #fdfdfd;
+  border: 1px solid var(--border-color);
+  border-left: 4px solid var(--primary-color);
+  border-radius: 6px;
+  padding: 15px;
+  margin-top: 20px;
+}
+
+.terms-box h4 {
+  font-family: 'Outfit', sans-serif;
+  font-size: 11px;
+  font-weight: 700;
+  color: var(--primary-color);
+  text-transform: uppercase;
+  margin-bottom: 8px;
+}
+
+.terms-box p {
+  font-size: 10px;
+  color: #4a5568;
+  line-height: 1.6;
+}
+
+/* ─── ITINERARY ─────────────────────────────────────────────── */
+.day-card {
+  border: 1px solid var(--border-color);
+  border-radius: 10px;
+  margin-bottom: 20px;
+  page-break-inside: avoid;
+}
+
+.day-card-header {
+  background: var(--bg-light);
+  padding: 12px 18px;
+  font-family: 'Outfit', sans-serif;
+  font-size: 14px;
+  font-weight: 700;
+  color: var(--primary-color);
+  border-bottom: 1px solid var(--border-color);
+}
+
+.day-item {
+  display: flex;
+  gap: 15px;
+  padding: 12px 18px;
+  border-bottom: 1px solid #edf2f7;
+}
+
+.day-item:last-child { border-bottom: none; }
+
+.day-item-type {
+  font-size: 10px;
+  font-weight: 700;
+  color: var(--secondary-color);
+  min-width: 80px;
+}
+
+.day-item-title { font-weight: 600; font-size: 12px; margin-bottom: 3px; }
+.day-item-desc { font-size: 10.5px; color: var(--text-muted); }
+
+/* ─── FOOTER ─────────────────────────────────────────────────── */
+.pdf-footer {
+  margin-top: 40px;
+  border-top: 1px solid var(--border-color);
+  padding-top: 15px;
+  text-align: center;
+  font-size: 9px;
+  color: var(--text-muted);
+}
+
+/* ─── UTILS ──────────────────────────────────────────────────── */
+.text-right { text-align: right; }
+.text-center { text-align: center; }
+.mono { font-family: 'Courier New', monospace; }
+.page-break { page-break-before: always; }

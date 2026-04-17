@@ -1,0 +1,105 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <style>:root { --primary-color: {{branding.primary_color}}; --secondary-color: {{branding.secondary_color}}; }</style>
+  <style>{{{baseCSS}}}</style>
+</head>
+<body>
+
+  <!-- HEADER -->
+  <div class="pdf-header">
+    <div class="pdf-header-logo">
+      {{#if branding.logo_url}}<img src="{{branding.logo_url}}" alt="{{branding.agency_name}}">{{/if}}
+      <div><div class="pdf-header-agency-name">{{branding.agency_name}}</div></div>
+    </div>
+    <div class="pdf-header-agency-details">
+      {{#if branding.agency_address}}<div>{{branding.agency_address}}</div>{{/if}}
+      {{#if branding.agency_phone}}<div>📞 {{branding.agency_phone}}</div>{{/if}}
+      {{#if branding.agency_email}}<div>✉ {{branding.agency_email}}</div>{{/if}}
+    </div>
+  </div>
+
+  <!-- COVER -->
+  {{#if cover_image}}
+  <div style="width:100%;height:180px;overflow:hidden;border-radius:6px;margin-bottom:20px;">
+    <img src="{{cover_image}}" style="width:100%;height:100%;object-fit:cover;" alt="{{destination}}">
+  </div>
+  {{/if}}
+
+  <!-- TITLE -->
+  <div class="pdf-title">{{defaultVal title destination}}</div>
+  <div class="pdf-subtitle">
+    {{#if destination}}{{destination}} · {{/if}}
+    {{#if start_date}}{{formatDate start_date}} – {{formatDate end_date}}{{/if}}
+  </div>
+
+  {{#if description}}
+  <p style="font-size:11px;color:#4a5568;margin-bottom:20px;line-height:1.7;">{{description}}</p>
+  {{/if}}
+
+  <!-- DAY-BY-DAY SCHEDULE -->
+  {{#each itinerary_days}}
+  <div class="day-card">
+    <div class="day-card-header">
+      Day {{this.day_number}}{{#if this.title}} — {{this.title}}{{/if}}
+      {{#if this.date}} · {{formatDate this.date}}{{/if}}
+    </div>
+    <div class="day-card-body">
+      {{#if this.description}}
+      <p style="font-size:10px;color:#718096;margin-bottom:8px;">{{this.description}}</p>
+      {{/if}}
+
+      {{#each this.itinerary_items}}
+      <div class="day-item">
+        <span class="day-item-type">{{this.item_type}}</span>
+        <div>
+          <div class="day-item-title">{{this.title}}</div>
+          {{#if this.description}}
+          <div class="day-item-desc">{{this.description}}</div>
+          {{/if}}
+          {{#if this.time_slot}}
+          <div class="day-item-desc">🕐 {{this.time_slot}}</div>
+          {{/if}}
+        </div>
+      </div>
+      {{/each}}
+
+      {{#unless this.itinerary_items}}
+      <p style="font-size:10px;color:#a0aec0;font-style:italic;">Free day — enjoy at your leisure</p>
+      {{/unless}}
+    </div>
+  </div>
+  {{/each}}
+
+  <!-- INCLUSIONS / EXCLUSIONS -->
+  {{#if inclusions}}
+  <div class="terms-box mt-20">
+    <h4>Inclusions</h4>
+    <p>{{inclusions}}</p>
+  </div>
+  {{/if}}
+
+  {{#if exclusions}}
+  <div class="terms-box" style="margin-top:8px;">
+    <h4>Exclusions</h4>
+    <p>{{exclusions}}</p>
+  </div>
+  {{/if}}
+
+  {{#if terms}}
+  <div class="terms-box" style="margin-top:8px;">
+    <h4>Terms & Conditions</h4>
+    <p>{{terms}}</p>
+  </div>
+  {{/if}}
+
+  <!-- FOOTER -->
+  <div class="pdf-footer">
+    <p>Curated with ❤ by {{branding.agency_name}}</p>
+    <p>Generated on {{generated_at}}</p>
+    {{#if branding.agency_website}}<p><a href="{{branding.agency_website}}">{{branding.agency_website}}</a></p>{{/if}}
+  </div>
+
+</body>
+</html>

@@ -1,0 +1,74 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <style>:root { --primary-color: {{branding.primary_color}}; --secondary-color: {{branding.secondary_color}}; }</style>
+  <style>{{{baseCSS}}}</style>
+</head>
+<body>
+
+  <!-- HEADER -->
+  <div class="pdf-header">
+    <div class="pdf-header-logo">
+      {{#if branding.logo_url}}<img src="{{branding.logo_url}}" alt="{{branding.agency_name}}">{{/if}}
+      <div>
+        <div class="pdf-header-agency-name">{{branding.agency_name}}</div>
+      </div>
+    </div>
+    <div class="pdf-header-agency-details">
+      {{#if branding.agency_address}}<div>{{branding.agency_address}}</div>{{/if}}
+      {{#if branding.agency_phone}}<div>📞 {{branding.agency_phone}}</div>{{/if}}
+      {{#if branding.agency_email}}<div>✉ {{branding.agency_email}}</div>{{/if}}
+    </div>
+  </div>
+
+  <!-- TITLE -->
+  <div class="pdf-title">Booking Confirmation</div>
+  <div class="pdf-subtitle">Confirmed for {{customer_name}}</div>
+
+  <!-- TRAVELLER INFO -->
+  <div class="pdf-section">
+    <div class="pdf-section-title">Traveller Details</div>
+    <div class="info-grid">
+      <div>
+        <div class="info-row"><span class="info-label">Customer</span><span class="info-value" style="font-weight:600;">{{customer_name}}</span></div>
+        {{#if customer_phone}}<div class="info-row"><span class="info-label">Phone</span><span class="info-value">{{customer_phone}}</span></div>{{/if}}
+        {{#if customer_email}}<div class="info-row"><span class="info-label">Email</span><span class="info-value">{{customer_email}}</span></div>{{/if}}
+      </div>
+      <div>
+        <div class="info-row"><span class="info-label">Booking Status</span><span class="info-value"><span class="badge badge-paid">{{uppercase status}}</span></span></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- TRIP INFO -->
+  <div class="pdf-section">
+    <div class="pdf-section-title">Trip Details</div>
+    <div class="info-grid">
+      <div>
+        {{#if destination}}<div class="info-row"><span class="info-label">Destination</span><span class="info-value">{{destination}}</span></div>{{/if}}
+        {{#if (or hotel_name location)}}<div class="info-row"><span class="info-label">Hotel/Location</span><span class="info-value">{{defaultVal hotel_name ""}} {{defaultVal location ""}}</span></div>{{/if}}
+      </div>
+      <div>
+        {{#if checkin_date}}<div class="info-row"><span class="info-label">Check-in</span><span class="info-value">{{formatDate checkin_date}}</span></div>{{/if}}
+        {{#if checkout_date}}<div class="info-row"><span class="info-label">Check-out</span><span class="info-value">{{formatDate checkout_date}}</span></div>{{/if}}
+        {{#if guests}}<div class="info-row"><span class="info-label">Guests / Rooms</span><span class="info-value">{{guests}} guest(s), {{defaultVal rooms 1}} room(s)</span></div>{{/if}}
+      </div>
+    </div>
+  </div>
+
+  <!-- PRICING -->
+  {{#if (or final_price price_seen)}}
+  <div class="totals-box mt-20">
+    <div class="totals-row grand-total"><span>Total Package</span><span>{{formatCurrency (defaultVal final_price price_seen)}}</span></div>
+  </div>
+  {{/if}}
+
+  <!-- FOOTER -->
+  <div class="pdf-footer">
+    <p>Thank you for choosing {{branding.agency_name}}. We look forward to making your trip memorable!</p>
+    <p>Generated on {{generated_at}}</p>
+  </div>
+
+</body>
+</html>
