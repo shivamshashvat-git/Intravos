@@ -8,7 +8,7 @@ import {
   Hotel, Plane, Target, Car, FileText, Utensils, 
   Shield, Coffee, Wifi, Landmark, ArrowLeft, RefreshCw, Lock,
   Globe, CheckCircle2, ChevronDown, ChevronUp, User, History,
-  Tent, Ship, Bike, Camera, Music, Palmtree
+  Tent, Ship, Bike, Camera, Music, Palmtree, LibraryBig, Upload
 } from 'lucide-react';
 
 // DND Kit
@@ -36,9 +36,13 @@ import { ItineraryItemType, ItineraryItem, ItineraryDay } from '@/features/opera
 import { itinerariesService } from '@/features/operations/services/itinerariesService';
 import { bookingsService } from '@/features/operations/services/bookingsService';
 import { PlacesAutocomplete } from '@/shared/components/PlacesAutocomplete';
+import { TemplatePicker } from '@/features/operations/components/TemplatePicker';
+import { PromoteToBank } from '@/features/operations/components/PromoteToBank';
 import { formatINR } from '@/utils/currency';
+import { useAuth } from '@/core/hooks/useAuth';
 import { clsx } from 'clsx';
 import { twMerge } from 'tailwind-merge';
+import { toast } from 'sonner';
 
 function cn(...inputs: any[]) {
   return twMerge(clsx(inputs));
@@ -53,12 +57,16 @@ export const ItineraryBuilderPage: React.FC = () => {
   const { 
     itinerary, isLoading, isSaving, 
     addDay, updateDay, deleteDay, reorderDays,
-    addItem, updateItem, deleteItem, reorderItemsInDay, 
-    toggleShare, refreshItinerary
+    updateItem, deleteItem, reorderItemsInDay, 
+    toggleShare, updateItinerary, loadFromTemplate, refreshItinerary
   } = useItinerary(id!);
 
+  const { user } = useAuth();
+  const isAdmin = user?.role === 'admin' || user?.role === 'super_admin';
+
   const [activeDayId, setActiveDayId] = useState<string | null>(null);
-  const [isTemplateModalOpen, setIsTemplateModalOpen] = useState(false);
+  const [showTemplatePicker, setShowTemplatePicker] = useState(false);
+  const [showPromoteToBank, setShowPromoteToBank] = useState(false);
   const [templateName, setTemplateName] = useState('');
   const [isEditingTitle, setIsEditingTitle] = useState(false);
   const [editingTitle, setEditingTitle] = useState('');
@@ -181,9 +189,17 @@ export const ItineraryBuilderPage: React.FC = () => {
             )}
           </div>
           
-          <button onClick={() => window.open(`/share/itinerary/${itinerary.public_slug}`, '_blank')} className="p-3 bg-white/5 border border-white/10 rounded-xl hover:bg-white/10 transition-all text-white/70" title="Preview Public View">
-            <Eye className="w-5 h-5" />
+          <button 
+             onClick={() => setShowTemplatePicker(true)}
+             className="px-6 py-2.5 bg-white border border-slate-200 text-slate-900 rounded-xl text-[10px] font-black uppercase italic tracking-widest hover:bg-slate-50 transition-all flex items-center gap-2 shadow-sm"
+          >
+             <LibraryBig className="w-4 h-4 text-indigo-600" /> 
+             {itinerary.days?.length === 0 ? 'Start from Template' : 'Load Blueprint'}
           </button>
+
+           <button onClick={() => window.open(`/trip/${itinerary.public_slug}`, '_blank')} className="p-3 bg-white/5 border border-white/10 rounded-xl hover:bg-white/10 transition-all text-white/70" title="Preview TripSite View">
+             <Eye className="w-5 h-5" />
+           </button>
           
           <button onClick={toggleShare} className={cn(
             "px-6 py-2.5 rounded-xl text-[10px] font-black uppercase tracking-[0.2em] transition-all border shadow-lg flex items-center gap-2",
@@ -285,24 +301,32 @@ export const ItineraryBuilderPage: React.FC = () => {
             <div className="bg-indigo-900 rounded-[2.5rem] p-8 text-white space-y-6 shadow-2xl shadow-indigo-200 relative overflow-hidden group">
               <Globe className="absolute -bottom-6 -right-6 w-32 h-32 opacity-10 group-hover:scale-110 transition-transform duration-700" />
               <div>
-                <p className="text-[10px] font-black uppercase tracking-widest opacity-50 mb-4">Public Operations Hub</p>
+                <p className="text-[10px] font-black uppercase tracking-widest opacity-50 mb-4">Traveler Experience Link</p>
                 <div className="flex items-center justify-between">
-                  <span className="text-xl font-black italic uppercase italic tracking-tighter">Client Portal</span>
+                  <span className="text-xl font-black italic uppercase italic tracking-tighter">TripSite UI</span>
                   <div className={cn("w-3 h-3 rounded-full shadow-[0_0_10px_rgba(255,255,255,0.5)]", itinerary.is_public ? "bg-emerald-400 animate-pulse" : "bg-red-400")} />
                 </div>
               </div>
 
               <div className="group/url bg-white/10 border border-white/10 rounded-2xl p-4 flex items-center justify-between">
-                <span className="text-[10px] font-bold text-white/60 truncate italic">/share/itinerary/{itinerary.public_slug}</span>
-                <button 
-                  onClick={() => {
-                    navigator.clipboard.writeText(`${window.location.origin}/share/itinerary/${itinerary.public_slug}`);
-                    alert('Command Link Copied.');
-                  }}
-                  className="p-2 hover:bg-white/20 rounded-lg transition-all"
-                >
-                  <Copy className="w-4 h-4" />
-                </button>
+                <span className="text-[10px] font-bold text-white/60 truncate italic">/trip/{itinerary.public_slug}</span>
+                <div className="flex items-center gap-1">
+                   <button 
+                     onClick={() => {
+                       navigator.clipboard.writeText(`${window.location.origin}/trip/${itinerary.public_slug}`);
+                       toast.success('TripSite link copied.');
+                     }}
+                     className="p-2 hover:bg-white/20 rounded-lg transition-all"
+                   >
+                     <Copy className="w-4 h-4" />
+                   </button>
+                   <button 
+                     onClick={() => window.open(`/trip/${itinerary.public_slug}`, '_blank')}
+                     className="p-2 hover:bg-white/20 rounded-lg transition-all"
+                   >
+                     <ExternalLink className="w-4 h-4" />
+                   </button>
+                </div>
               </div>
 
               <button 
@@ -314,6 +338,15 @@ export const ItineraryBuilderPage: React.FC = () => {
               >
                 {itinerary.is_public ? 'Disable Cloud Access' : 'Enable Live Deployment'}
               </button>
+
+              {isAdmin && !itinerary.is_template && (
+                <button 
+                  onClick={() => setShowPromoteToBank(true)}
+                  className="w-full py-4 mt-4 bg-white border border-slate-200 text-slate-600 rounded-2xl text-[10px] font-black uppercase tracking-widest hover:bg-slate-50 hover:text-indigo-600 transition-all flex items-center justify-center gap-2 italic"
+                >
+                   <Upload className="w-4 h-4" /> Promote to Knowledge Bank
+                </button>
+              )}
             </div>
           </section>
 
@@ -339,6 +372,20 @@ export const ItineraryBuilderPage: React.FC = () => {
           </section>
         </aside>
       </main>
+
+      {/* Operation Modals */}
+      <TemplatePicker 
+         isOpen={showTemplatePicker}
+         onClose={() => setShowTemplatePicker(false)}
+         onSelect={loadFromTemplate}
+         hasExistingDays={itinerary.days.length > 0}
+      />
+
+      <PromoteToBank 
+         isOpen={showPromoteToBank}
+         onClose={() => setShowPromoteToBank(false)}
+         itinerary={itinerary}
+      />
     </div>
   );
 };

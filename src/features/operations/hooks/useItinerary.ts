@@ -166,6 +166,20 @@ export function useItinerary(id: string) {
     await itinerariesService.updateItinerary(data.id, tenant.id, updates);
   };
 
+  const loadFromTemplate = async (templateId: string) => {
+    if (!id || !tenant?.id) return;
+    setIsSaving(true);
+    try {
+      await itinerariesService.loadTemplate(id, templateId);
+      await fetchData();
+    } catch (e: any) {
+      console.error(e);
+      throw e;
+    } finally {
+      setIsSaving(false);
+    }
+  };
+
   return {
     itinerary: data,
     isLoading,
@@ -180,6 +194,7 @@ export function useItinerary(id: string) {
     reorderItemsInDay,
     toggleShare,
     updateItinerary,
+    loadFromTemplate,
     refreshItinerary: fetchData
   };
 }

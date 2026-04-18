@@ -174,6 +174,13 @@ class InvoicesController {
       next(error);
     }
   }
+
+  async createPaymentLink(req, res, next) {
+    try {
+      const link = await invoiceService.createPaymentLink(req.user.tenantId, req.params.id);
+      return response.success(res, { payment_link_url: link });
+    } catch (error) { next(error); }
+  }
 }
 
 export default new InvoicesController();

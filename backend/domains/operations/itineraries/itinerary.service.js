@@ -243,6 +243,81 @@ class ItineraryService {
     await Promise.all(updates);
     return { success: true };
   }
+
+  async loadTemplate(tenantId, itineraryId, templateId) {
+    const template = await this.getItineraryById(tenantId, templateId);
+    if (!template || !template.is_template) throw new Error('Valid template not found');
+
+    // Delete existing days
+    await supabaseAdmin
+      .from('itinerary_days')
+      .update({ deleted_at: new Date().toISOString() })
+      .eq('itinerary_id', itineraryId)
+      .eq('tenant_id', tenantId);
+
+    // Deep copy from template
+    if (template.itinerary_days?.length) {
+      for (const day of template.itinerary_days) {
+        const { id, itinerary_id, itinerary_items, created_at, updated_at, ...dayData } = day;
+        const { data: newDay } = await supabaseAdmin
+          .from('itinerary_days')
+          .insert({ ...dayData, itinerary_id: itineraryId, tenant_id: tenantId })
+          .select('id')
+          .single();
+
+        if (newDay && itinerary_items?.length) {
+          const newItems = itinerary_items.map(({ id: itemId, day_id, created_at, updated_at, ...item }) => ({
+            ...item,
+            day_id: newDay.id,
+            tenant_id: tenantId
+          }));
+          await supabaseAdmin.from('itinerary_items').insert(newItems);
+        }
+      }
+    }
+    return { success: true };
+  }
+
+  async promoteToTemplate(tenantId, userId, itineraryId, payload) {
+    const original = await this.getItineraryById(tenantId, itineraryId);
+    if (!original) throw new Error('Itinerary not found');
+
+    const { data: template, error } = await supabaseAdmin
+      .from('itineraries')
+      .insert({
+        ...payload,
+        is_template: true,
+        tenant_id: tenantId,
+        created_by: userId
+      })
+      .select()
+      .single();
+
+    if (error) throw error;
+
+    // Deep copy days and items
+    if (original.itinerary_days?.length) {
+      for (const day of original.itinerary_days) {
+        const { id, itinerary_id, itinerary_items, created_at, updated_at, ...dayData } = day;
+        const { data: newDay } = await supabaseAdmin
+          .from('itinerary_days')
+          .insert({ ...dayData, itinerary_id: template.id, tenant_id: tenantId })
+          .select('id')
+          .single();
+
+        if (newDay && itinerary_items?.length) {
+          const newItems = itinerary_items.map(({ id: itemId, day_id, created_at, updated_at, ...item }) => ({
+            ...item,
+            day_id: newDay.id,
+            tenant_id: tenantId
+          }));
+          await supabaseAdmin.from('itinerary_items').insert(newItems);
+        }
+      }
+    }
+    
+    return template;
+  }
 }
 
 export default new ItineraryService();

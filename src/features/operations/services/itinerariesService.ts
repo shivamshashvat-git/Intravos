@@ -1,4 +1,5 @@
 import { supabase } from '@/core/lib/supabase';
+import { apiClient } from '@/core/lib/apiClient';
 import { Itinerary, ItineraryDay, ItineraryItem, ItineraryFilters, ItineraryWithDetails } from '@/features/operations/types/itinerary';
 
 export const itinerariesService = {
@@ -166,6 +167,16 @@ export const itinerariesService = {
 
   async saveAsTemplate(id: string, templateName: string) {
     return this.duplicateItinerary(id, { is_template: true, template_name: templateName });
+  },
+
+  async loadTemplate(id: string, templateId: string) {
+    const res = await apiClient.post(`/api/itineraries/${id}/load-template/${templateId}`);
+    return res.data;
+  },
+
+  async promoteToTemplate(id: string, payload: any) {
+    const res = await apiClient.post(`/api/itineraries/${id}/promote-to-template`, payload);
+    return res.data;
   },
 
   // Day Ops

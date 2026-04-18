@@ -57,5 +57,6 @@ router.post('/', authenticate, requireStaff(), requireWriteAccess, requireFeatur
 router.patch('/:id', authenticate, requireStaff(), requireWriteAccess, requireFeature('invoicing'), asyncHandler((req, res) => invoicesController.updateInvoice(req, res)));
 router.delete('/:id', authenticate, requireAdmin(), requireWriteAccess, requireFeature('invoicing'), asyncHandler((req, res) => invoicesController.deleteInvoice(req, res)));
 router.post('/:id/credit-note', authenticate, requireAdmin(), requireWriteAccess, requireFeature('invoicing'), validate(creditNoteSchema), asyncHandler((req, res) => invoicesController.createCreditNote(req, res)));
+router.post('/:id/create-payment-link', authenticate, requireStaff(), requireWriteAccess, requireFeature('invoicing'), asyncHandler((req, res) => invoicesController.createPaymentLink(req, res)));
 
 export default router;

@@ -199,6 +199,20 @@ class ItinerariesController {
       return response.success(res, { success: true }, 'Day sequence synchronized');
     } catch (error) { next(error); }
   }
+
+  async post_id_load_template(req, res, next) {
+    try {
+      await itineraryService.loadTemplate(req.user.tenantId, req.params.id, req.params.templateId);
+      return response.success(res, { success: true }, 'Template loaded successfully');
+    } catch (error) { next(error); }
+  }
+
+  async post_id_promote_to_template(req, res, next) {
+    try {
+      const template = await itineraryService.promoteToTemplate(req.user.tenantId, req.user.id, req.params.id, req.body);
+      return response.success(res, { template }, 'Itinerary promoted to template successfully', 201);
+    } catch (error) { next(error); }
+  }
 }
 
 export default new ItinerariesController();

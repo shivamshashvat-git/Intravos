@@ -15,6 +15,7 @@ import { toast } from 'sonner';
 import { TeamMember, BankAccount, TenantSettings } from '../types/settings';
 import { InviteMemberDrawer } from '../components/InviteMemberDrawer';
 import { AddBankAccountDrawer } from '../components/AddBankAccountDrawer';
+import { TrashPanel } from '../components/TrashPanel';
 
 export const SettingsPage: React.FC = () => {
   const { user, tenant: authTenant } = useAuth();
@@ -35,6 +36,7 @@ export const SettingsPage: React.FC = () => {
     { id: 'invoice', label: 'Invoice & Quote', icon: FileText, adminOnly: true },
     { id: 'bank', label: 'Bank Accounts', icon: Landmark, adminOnly: true },
     { id: 'subscription', label: 'Subscription', icon: CreditCard, adminOnly: true },
+    { id: 'trash', label: 'Recycle Bin', icon: Trash2, adminOnly: true },
   ];
 
   if (isLoading) return <div className="h-screen flex items-center justify-center font-black italic text-slate-300">Synchronizing Parameters...</div>;
@@ -82,6 +84,7 @@ export const SettingsPage: React.FC = () => {
              {activeTab === 'invoice' && isAdmin && <InvoiceQuoteSection tenant={tenant!} onUpdate={updateProfile} isSaving={isSaving} />}
              {activeTab === 'bank' && isAdmin && <BankAccountsSection accounts={bankAccounts} onRefresh={refresh} tenantId={tenant?.id!} />}
              {activeTab === 'subscription' && isAdmin && <SubscriptionSection tenant={tenant!} />}
+             {activeTab === 'trash' && <TrashPanel />}
           </div>
        </main>
     </div>

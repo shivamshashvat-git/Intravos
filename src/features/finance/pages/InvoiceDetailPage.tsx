@@ -4,7 +4,7 @@ import {
   Edit3, Send, CheckCircle, XCircle, Copy, Trash2, 
   ArrowLeft, FileText, Calendar, Wallet, Landmark,
   History, Info, Download, Printer, Plus, MoreHorizontal,
-  ChevronRight, ArrowRight, Smartphone, CreditCard
+  ChevronRight, ArrowRight, Smartphone, CreditCard, Lock
 } from 'lucide-react';
 import { useInvoiceDetail } from '../hooks/useInvoiceDetail';
 import { useAuth } from '@/core/hooks/useAuth';
@@ -19,7 +19,7 @@ export const InvoiceDetailPage: React.FC = () => {
   const { id } = useParams();
   const navigate = useNavigate();
   const { user } = useAuth();
-  const { invoice, isLoading, recordPayment, updateStatus, deletePayment } = useInvoiceDetail(id!);
+  const { invoice, isLoading, recordPayment, updateStatus, deletePayment, generatePaymentLink } = useInvoiceDetail(id!);
   const [isPaymentDrawerOpen, setIsPaymentDrawerOpen] = useState(false);
 
   const isAdmin = user?.role === 'admin' || user?.role === 'super_admin';
@@ -260,6 +260,46 @@ export const InvoiceDetailPage: React.FC = () => {
                   </div>
                </div>
             </div>
+
+            {/* Payment Link Card */}
+            {['draft', 'sent', 'overdue', 'partially_paid'].includes(invoice.status) && (
+            <div className="bg-white rounded-[3rem] border border-slate-200 p-10 shadow-xl space-y-6">
+                <h3 className="text-[10px] font-black uppercase text-slate-400 tracking-widest italic flex items-center gap-3">
+                   <Lock className="w-4 h-4 text-indigo-500" /> Hosted Checkout
+                </h3>
+                
+                <p className="text-xs font-bold text-slate-500 italic">Customers complete payment on a secure hosted page</p>
+
+                {invoice.payment_link_url ? (
+                   <div className="space-y-4">
+                      <div className="p-4 bg-emerald-50 text-emerald-600 rounded-2xl flex items-center justify-between">
+                         <span className="text-[9px] font-black uppercase tracking-widest">Link Active</span>
+                         <CheckCircle className="w-4 h-4" />
+                      </div>
+                      <div className="flex gap-2">
+                         <button onClick={() => { navigator.clipboard.writeText(invoice.payment_link_url!); toast.success('Link copied'); }} className="flex-1 py-4 bg-slate-900 text-white rounded-3xl text-[10px] font-black uppercase tracking-widest hover:scale-105 transition-transform flex items-center justify-center gap-2">
+                             <Copy className="w-4 h-4" /> Copy Link
+                         </button>
+                         <a href={invoice.payment_link_url} target="_blank" rel="noreferrer" className="flex-1 py-4 bg-slate-50 text-slate-900 rounded-3xl text-[10px] font-black uppercase tracking-widest hover:bg-slate-100 transition-colors flex items-center justify-center gap-2">
+                             <ChevronRight className="w-4 h-4" /> Open
+                         </a>
+                      </div>
+                   </div>
+                ) : (
+                   <button onClick={async () => {
+                      try {
+                        const link = await generatePaymentLink();
+                        navigator.clipboard.writeText(link);
+                        toast.success('Hosted checkout link generated & copied successfully!');
+                      } catch(e) {
+                         toast.error('Failed to generate payment link');
+                      }
+                   }} className="w-full py-4 bg-indigo-600 text-white rounded-3xl text-[11px] font-black uppercase tracking-widest shadow-xl shadow-indigo-200 hover:scale-[1.02] active:scale-95 transition-all">
+                      Create Payment Link
+                   </button>
+                )}
+            </div>
+            )}
 
             {/* GST Details Card */}
             <div className="bg-white rounded-[3rem] border border-slate-200 p-10 shadow-xl space-y-8">

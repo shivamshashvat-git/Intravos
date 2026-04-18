@@ -63,6 +63,14 @@ router.delete('/:id', authenticate, requireAdmin(), requireWriteAccess, requireF
 // POST /api/itineraries/:id/duplicate
 router.post('/:id/duplicate', authenticate, requireStaff(), requireWriteAccess, requireFeature('itineraries'), asyncHandler((req, res, next) => itinerariesController.post_id_duplicate_7(req, res, next)));;
 
+// ── KNOWLEDGE BANK BRIDGE ──
+
+// POST /api/itineraries/:id/load-template/:templateId
+router.post('/:id/load-template/:templateId', authenticate, requireStaff(), requireWriteAccess, requireFeature('itineraries'), asyncHandler((req, res, next) => itinerariesController.post_id_load_template(req, res, next)));
+
+// POST /api/itineraries/:id/promote-to-template
+router.post('/:id/promote-to-template', authenticate, requireAdmin(), requireWriteAccess, requireFeature('itineraries'), asyncHandler((req, res, next) => itinerariesController.post_id_promote_to_template(req, res, next)));
+
 // ── DAYS ──
 
 // POST /api/itineraries/:id/days

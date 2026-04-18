@@ -60,6 +60,17 @@ export function useInvoiceDetail(id: string) {
     }
   };
 
+  const generatePaymentLink = async () => {
+    try {
+      const data = await invoicesService.createPaymentLink(id);
+      await fetchData();
+      return data.payment_link_url;
+    } catch (e: any) {
+      console.error(e);
+      throw e;
+    }
+  };
+
   return {
     invoice,
     isLoading,
@@ -67,6 +78,7 @@ export function useInvoiceDetail(id: string) {
     refresh: fetchData,
     recordPayment,
     deletePayment,
-    updateStatus
+    updateStatus,
+    generatePaymentLink
   };
 }

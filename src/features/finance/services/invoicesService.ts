@@ -1,6 +1,7 @@
 import { supabase } from '@/core/lib/supabase';
 import { Invoice, InvoiceItem, InvoiceStatus, InvoiceFilters, PaymentTransaction } from '../types/invoice';
 import { quotationsService } from './quotationsService';
+import { apiClient } from '@/core/lib/apiClient';
 
 export const invoicesService = {
   async getInvoices(tenantId: string, filters?: InvoiceFilters) {
@@ -162,6 +163,11 @@ export const invoicesService = {
     }
     const { error } = await supabase.from('invoices').update({ deleted_at: new Date().toISOString() }).eq('id', id);
     if (error) throw error;
+  },
+
+  async createPaymentLink(invoiceId: string) {
+    const res = await apiClient.post(`/api/finance/invoices/${invoiceId}/create-payment-link`);
+    return res.data;
   },
 
   async recalculate(invoiceId: string) {

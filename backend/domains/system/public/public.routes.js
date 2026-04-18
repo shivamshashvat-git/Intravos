@@ -13,4 +13,12 @@ router.post('/leads', authenticateApiKey, asyncHandler((req, res, next) => publi
 // GET /api/public/offers
 router.get('/offers', authenticateApiKey, asyncHandler((req, res, next) => publicController.get_offers(req, res, next)));
 
+// ── TRIPSITE (Public Facing) ──
+router.get('/trip/:token', asyncHandler((req, res, next) => publicController.get_trip(req, res, next)));
+router.post('/trip/:token/approve', asyncHandler((req, res, next) => publicController.post_trip_approve(req, res, next)));
+router.post('/trip/:token/request-changes', asyncHandler((req, res, next) => publicController.post_trip_changes(req, res, next)));
+
+// ── WEBHOOKS ──
+router.post('/webhooks/payments', asyncHandler((req, res, next) => publicController.post_webhook_payments(req, res, next)));
+
 export default router;

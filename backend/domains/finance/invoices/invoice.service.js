@@ -222,6 +222,22 @@ class InvoiceService {
     if (error) throw error;
     return data || [];
   }
+
+  async createPaymentLink(tenantId, invoiceId) {
+     const invoice = await this.getById(tenantId, invoiceId);
+     if (!invoice) throw new Error("Invoice not found");
+     
+     if (invoice.payment_link_url) return invoice.payment_link_url;
+
+     const balance = (invoice.total || 0) - (invoice.amount_paid || 0);
+     if (balance <= 0) throw new Error("Invoice already paid");
+
+     const mockGatewayUrl = `https://checkout.sandbox.paymentgateway.com/pay/${invoice.id}`;
+
+     await supabaseAdmin.from('invoices').update({ payment_link_url: mockGatewayUrl }).eq('id', invoiceId);
+     
+     return mockGatewayUrl;
+  }
 }
 
 export default new InvoiceService();

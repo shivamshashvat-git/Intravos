@@ -16,7 +16,10 @@ import {
   X,
   ChevronRight,
   User as UserIcon,
-  Stamp
+  Stamp,
+  LibraryBig,
+  Wallet,
+  Percent
 } from 'lucide-react';
 import { useAuth } from '@/core/hooks/useAuth';
 import { NotificationBell } from '@/shared/components/NotificationBell';
@@ -46,10 +49,13 @@ export const AppShell: React.FC = () => {
     { name: 'Customers', to: '/customers', icon: UserCheck },
     { name: 'Bookings', to: '/bookings', icon: Briefcase },
     { name: 'Itineraries', to: '/itineraries', icon: Map },
+    { name: 'Knowledge Bank', to: '/knowledge-bank', icon: LibraryBig },
     { name: 'Visa Tracking', to: '/visa', icon: Stamp },
     { type: 'header', name: 'Finance', icon: FileText },
     { name: 'Quotations', to: '/quotations', icon: FileText, indent: true },
     { name: 'Invoices', to: '/invoices', icon: CreditCard, indent: true },
+    { name: 'Vendor Ledger', to: '/vendor-ledger', icon: Wallet, indent: true },
+    { name: 'Pricing Rules', to: '/markup-presets', icon: Percent, indent: true },
     { name: 'Tasks', to: '/tasks', icon: CheckSquare },
     { name: 'Settings', to: '/settings', icon: Settings },
   ];
