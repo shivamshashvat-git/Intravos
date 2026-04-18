@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { X, AlertTriangle, Calculator, RefreshCw } from 'lucide-react';
+import { X, AlertTriangle, Calculator, RefreshCw, Info } from 'lucide-react';
 import { formatINR } from '@/utils/currency';
 
 interface CancellationModalProps {

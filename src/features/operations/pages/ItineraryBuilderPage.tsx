@@ -244,7 +244,7 @@ export const ItineraryBuilderPage: React.FC = () => {
                 <input 
                   className="w-full px-6 py-4 bg-white border border-slate-200 rounded-2xl text-sm font-black uppercase italic outline-none focus:ring-4 focus:ring-indigo-100 transition-all"
                   value={itinerary.title}
-                  onChange={e => updateItinerary(itinerary.id, itinerary.tenant_id, { title: e.target.value })}
+                  onChange={e => itinerariesService.updateItinerary(itinerary.id, itinerary.tenant_id, { title: e.target.value })}
                 />
               </div>
 
@@ -254,7 +254,7 @@ export const ItineraryBuilderPage: React.FC = () => {
                   className="w-full px-6 py-4 bg-white border border-slate-200 rounded-2xl text-sm font-black uppercase italic outline-none focus:ring-4 focus:ring-indigo-100 transition-all"
                   value={itinerary.destination || ''}
                   placeholder="e.g. BALI, INDONESIA"
-                  onChange={e => updateItinerary(itinerary.id, itinerary.tenant_id, { destination: e.target.value })}
+                  onChange={e => itinerariesService.updateItinerary(itinerary.id, itinerary.tenant_id, { destination: e.target.value })}
                 />
               </div>
 
@@ -265,7 +265,7 @@ export const ItineraryBuilderPage: React.FC = () => {
                     type="date"
                     className="w-full px-6 py-4 bg-white border border-slate-200 rounded-2xl text-xs font-black outline-none focus:ring-4 focus:ring-indigo-100 uppercase"
                     value={itinerary.start_date || ''}
-                    onChange={e => updateItinerary(itinerary.id, itinerary.tenant_id, { start_date: e.target.value })}
+                    onChange={e => itinerariesService.updateItinerary(itinerary.id, itinerary.tenant_id, { start_date: e.target.value })}
                   />
                 </div>
                 <div className="space-y-2">
@@ -420,7 +420,7 @@ const SortableDay: React.FC<{
                onChange={e => updateDay(day.id, { title: e.target.value })} 
              />
              <p className="text-[10px] font-black uppercase tracking-[0.2em] text-indigo-400 flex items-center gap-2">
-               <Calendar className="w-3 h-3" /> {dayDate ? dayDate.toLocaleDateString('en-IN', { day: '2-digit', month: 'LONG', year: 'numeric' }) : 'Floating Sequence Node'}
+               <Calendar className="w-3 h-3" /> {dayDate ? dayDate.toLocaleDateString('en-IN', { day: '2-digit', month: 'long', year: 'numeric' }) : 'Floating Sequence Node'}
              </p>
           </div>
         </div>

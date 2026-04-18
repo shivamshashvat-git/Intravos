@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { X, Target, MapPin, Calendar, Users, Briefcase, FileText, IndianRupee, Info, Clock, ShieldCheck, User } from 'lucide-react';
 import { Booking, BookingPriority } from '../types/booking';
+import { Customer } from '@/features/crm/types/customer';
 import { bookingsService } from '../services/bookingsService';
 import { quotationsService } from '@/features/finance/services/quotationsService';
 import { invoicesService } from '@/features/finance/services/invoicesService';
@@ -41,7 +42,7 @@ export const CreateBookingDrawer: React.FC<Props> = ({
 
   const [customerSearch, setCustomerSearch] = useState('');
   const [selectedCustomer, setSelectedCustomer] = useState<any>(null);
-  const [customers, setCustomers] = useState<any[]>([]);
+  const [customers, setCustomers] = useState<Customer[]>([]);
 
   const [quotations, setQuotations] = useState<any[]>([]);
   const [invoices, setInvoices] = useState<any[]>([]);
@@ -51,8 +52,8 @@ export const CreateBookingDrawer: React.FC<Props> = ({
         leadsService.getLeadById(preFillLeadId).then(({ lead: l }) => {
             setFormData((prev: Partial<Booking>) => ({
                 ...prev,
-                lead_id: l.id,
-                customer_id: l.customer_id,
+                lead_id: l.id || undefined,
+                customer_id: l.customer_id || undefined,
                 title: `${l.customer_name}'s Mission`,
                 destination: l.destination || '',
                 travel_date_start: l.travel_start_date || '',
@@ -102,10 +103,10 @@ export const CreateBookingDrawer: React.FC<Props> = ({
 
   const searchCustomers = async (val: string) => {
     setCustomerSearch(val);
-    if (val.length > 2) {
-       const res = await customersService.getCustomers(tenant!.id, { search: val });
-       setCustomers(res);
-    }
+     if (val.length > 2) {
+        const res = await customersService.getCustomers(tenant!.id, { search: val });
+        setCustomers(res.data);
+     }
   };
 
   if (!isOpen) return null;

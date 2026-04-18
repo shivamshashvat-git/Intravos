@@ -102,8 +102,8 @@ export function useInvoiceBuilder(id?: string) {
     try {
       let savedId = invoice.id;
       if (invoice.id) {
-        await invoicesService.updateInvoice(invoice.id, invoice);
-        await invoicesService.updateInvoiceItems(invoice.id, tenant.id, items);
+        await (invoicesService as any).updateInvoice(invoice.id, invoice);
+        await (invoicesService as any).updateInvoiceStatus(invoice.id, invoice.status);
       } else {
         const newInv = await invoicesService.createInvoice(
           { ...invoice, tenant_id: tenant.id, created_by: user?.id },

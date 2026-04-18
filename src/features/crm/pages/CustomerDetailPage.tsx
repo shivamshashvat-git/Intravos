@@ -4,7 +4,8 @@ import {
   ChevronLeft, Phone, Mail, MapPin, Calendar, Users, 
   CreditCard, FileText, CheckCircle2, AlertCircle, Edit3, 
   Trash2, Archive, MoreVertical, Plus, Plane, Hotel, Utensils,
-  Eye, EyeOff, Lock, Hash, Save, X, Globe, User, History, Info, ChevronRight, Building2, Wallet
+  Eye, EyeOff, Lock, Hash, Save, X, Globe, User, History, Info, ChevronRight, Building2, Wallet,
+  Clock, Activity, Timer
 } from 'lucide-react';
 import { useCustomerDetail } from '@/features/crm/hooks/useCustomerDetail';
 import { customersService } from '@/features/crm/services/customersService';
@@ -23,6 +24,7 @@ import { getAvatarColor, getInitials } from '@/utils/colors';
 import { maskPassport, maskAadhar, maskPAN } from '@/utils/mask';
 import { clsx } from 'clsx';
 import { twMerge } from 'tailwind-merge';
+import { CreateBookingDrawer } from '@/features/operations/components/CreateBookingDrawer';
 
 function cn(...inputs: any[]) {
   return twMerge(clsx(inputs));
@@ -43,6 +45,7 @@ export const CustomerDetailPage: React.FC = () => {
   const [isEditDrawerOpen, setIsEditDrawerOpen] = useState(false);
   const [selectedInvoice, setSelectedInvoice] = useState<Invoice | null>(null);
   const [isPaymentDrawerOpen, setIsPaymentDrawerOpen] = useState(false);
+  const [isBookingDrawerOpen, setIsBookingDrawerOpen] = useState(false);
   const [maskState, setMaskState] = useState(true);
   const [toast, setToast] = useState<{ message: string, type: 'success' | 'error' } | null>(null);
 
@@ -249,7 +252,7 @@ export const CustomerDetailPage: React.FC = () => {
                               <div className="flex items-center justify-between">
                                  <div>
                                     <p className="text-xs font-black text-slate-900 tracking-tight italic uppercase">{b.booking_number} • {b.destination}</p>
-                                    <p className="text-[10px] font-bold text-slate-400">{new Date(b.travel_start_date!).toDateString()}</p>
+                                    <p className="text-[10px] font-bold text-slate-400">{new Date(b.travel_date_start!).toDateString()}</p>
                                  </div>
                                  <span className={clsx(
                                    "px-2 py-0.5 rounded text-[8px] font-black uppercase",
@@ -321,7 +324,7 @@ export const CustomerDetailPage: React.FC = () => {
                                     </div>
                                  </div>
                                  <div className="flex items-center gap-4">
-                                    <span className="text-xs font-black italic">{formatINR(q.total)}</span>
+                                    <span className="text-xs font-black italic">{formatINR(q.total_amount)}</span>
                                     <span className={clsx(
                                        "text-[10px] font-black uppercase tracking-widest px-2 py-0.5 rounded border border-slate-100 bg-slate-50 text-slate-500",
                                        q.status === 'accepted' && "bg-emerald-50 text-emerald-600 border-emerald-100"

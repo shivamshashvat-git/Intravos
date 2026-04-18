@@ -101,7 +101,7 @@ export const PublicItineraryPage: React.FC = () => {
                   </div>
                   <div>
                      <p className="text-[10px] font-black uppercase tracking-widest text-slate-400">Mission Start</p>
-                     <p className="text-xl font-black italic uppercase italic tracking-tight">{new Date(itinerary.start_date).toLocaleDateString('en-IN', { day: '2-digit', month: 'LONG' })}</p>
+                     <p className="text-xl font-black italic uppercase italic tracking-tight">{new Date(itinerary.start_date).toLocaleDateString('en-IN', { day: '2-digit', month: 'long' })}</p>
                   </div>
                </div>
             )}
@@ -130,7 +130,7 @@ export const PublicItineraryPage: React.FC = () => {
                  </div>
                  <div className="flex-1 pb-1">
                     <h2 className="text-3xl font-black uppercase italic italic text-slate-950 tracking-tight">{day.title || 'In Mission Progression'}</h2>
-                    <p className="text-[10px] font-black uppercase tracking-[0.4em] text-indigo-600 mt-2">{dayDate ? dayDate.toLocaleDateString('en-IN', { day: '2-digit', month: 'LONG', year: 'numeric' }) : 'Continuous Sequence'}</p>
+                    <p className="text-[10px] font-black uppercase tracking-[0.4em] text-indigo-600 mt-2">{dayDate ? dayDate.toLocaleDateString('en-IN', { day: '2-digit', month: 'long', year: 'numeric' }) : 'Continuous Sequence'}</p>
                  </div>
               </div>
 

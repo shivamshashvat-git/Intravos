@@ -484,7 +484,7 @@ export const BookingDetailPage: React.FC = () => {
       <CreateVisaDrawer 
         isOpen={isDrawerOpen} 
         onClose={() => setIsDrawerOpen(false)} 
-        initialData={{ booking_id: booking.id, customer_id: booking.customer_id, destination: booking.destination }} 
+        initialData={{ booking_id: booking.id, customer_id: booking.customer_id }} 
       />
     </div>
   );

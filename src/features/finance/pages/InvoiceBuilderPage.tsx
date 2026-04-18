@@ -138,7 +138,7 @@ export const InvoiceBuilderPage: React.FC = () => {
                              <input type="number" className="w-28 p-3 bg-slate-900 border border-slate-800 text-white rounded-xl text-right text-xs font-black" value={item.unit_price} onChange={e => updateItem(index, { unit_price: parseFloat(e.target.value) || 0 })} />
                          </div>
                          <div className="flex gap-2">
-                            <button onClick={() => updateItem(index, { _isExpanded: !(item as any)._isExpanded })} className={clsx("p-3 rounded-xl transition-all", (item as any)._isExpanded ? "bg-indigo-600 text-white" : "bg-slate-50 text-slate-300")}><SettingsIcon className="w-4 h-4" /></button>
+                            <button onClick={() => updateItem(index, { _isExpanded: !(item as any)._isExpanded } as any)} className={clsx("p-3 rounded-xl transition-all", (item as any)._isExpanded ? "bg-indigo-600 text-white" : "bg-slate-50 text-slate-300")}><SettingsIcon className="w-4 h-4" /></button>
                             <button onClick={() => removeItem(index)} className="p-3 bg-slate-50 text-slate-300 hover:text-rose-500 rounded-xl"><Trash2 className="w-4 h-4" /></button>
                          </div>
                       </div>

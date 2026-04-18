@@ -37,15 +37,17 @@ export const itinerariesService = {
     return data as Itinerary[];
   },
 
-  async getItineraryById(id: string, tenantId: string) {
+  async getItineraryById(id: string, tenantId?: string) {
     // Fetch itinerary
-    const { data: itinerary, error: iError } = await supabase
+    let query = supabase
       .from('itineraries')
       .select('*')
       .eq('id', id)
-      .eq('tenant_id', tenantId)
-      .is('deleted_at', null)
-      .single();
+      .is('deleted_at', null);
+    
+    if (tenantId) query = query.eq('tenant_id', tenantId);
+
+    const { data: itinerary, error: iError } = await query.single();
     if (iError) throw iError;
 
     // Fetch days and items in one or two queries

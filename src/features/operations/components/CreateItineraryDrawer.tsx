@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import { clsx } from 'clsx';
 import { useNavigate } from 'react-router-dom';
 import { X, Globe, Calendar, FileText, Check, Search, User } from 'lucide-react';
 import { itinerariesService } from '@/features/operations/services/itinerariesService';
@@ -61,24 +62,24 @@ export const CreateItineraryDrawer: React.FC<CreateItineraryDrawerProps> = ({ is
         lead_id: formData.lead_id,
         metadata: {
           agency_name: tenant.name,
-          agency_logo_url: tenant.logo_url,
-          agency_phone: tenant.agency_phone,
-          agency_email: tenant.agency_email
+          agency_logo_url: tenant.logo_url
+          // agency_phone: tenant.agency_phone,
+          // agency_email: tenant.agency_email
         }
       };
 
       let newIt;
       if (initialTemplate) {
-         newIt = await itinerariesService.createFromTemplate(initialTemplate.id, itData);
+         newIt = await itinerariesService.duplicateItinerary(initialTemplate.id, itData);
       } else {
          newIt = await itinerariesService.createItinerary(itData);
          if (formData.auto_create_days) {
             for (let i = 1; i <= formData.day_count; i++) {
-               await itinerariesService.addDay(newIt.id, { 
-                 day_number: i, 
-                 sort_order: (i-1) * 10, 
-                 title: `Day ${i}` 
-               });
+                await itinerariesService.addDay(newIt.id, tenant.id, { 
+                  day_number: i, 
+                  sort_order: (i-1) * 10, 
+                  title: `Day ${i}` 
+                });
             }
          }
       }

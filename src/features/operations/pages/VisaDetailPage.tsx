@@ -6,7 +6,8 @@ import {
   Trash2, Download, AlertCircle, CheckCircle2,
   XCircle, ChevronRight, Hash, Phone, Building,
   Navigation, Plane, Landmark, Briefcase, Camera,
-  Banknote, Shield, Receipt, MoreVertical, Edit2
+  Banknote, Shield, Receipt, MoreVertical, Edit2,
+  Wallet, ArrowRight, Lock
 } from 'lucide-react';
 import { useVisa } from '../hooks/useVisa';
 import { formatINR } from '@/utils/currency';

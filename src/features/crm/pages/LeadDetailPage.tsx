@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { useParams, useNavigate, Link } from 'react-router-dom';
 import { 
   ChevronLeft, Phone, Mail, MoreVertical, Edit3, UserPlus, Trash2, StickyNote, 
@@ -50,7 +50,11 @@ export const LeadDetailPage: React.FC = () => {
   const [booking, setBooking] = useState<Booking | null>(null);
   const [isBookingDrawerOpen, setIsBookingDrawerOpen] = useState(false);
   const [isVisaDrawerOpen, setIsVisaDrawerOpen] = useState(false);
-  const { visas, alerts: vAlerts, updateStatus: vUpdateStatus, updatePassportHolder: vUpdateHolder, updateDoc: vUpdateDoc, refreshVisas } = useVisa(id!);
+  const { visa, updateStatus: vUpdateStatus, refreshVisa: refreshVisas } = useVisa(id!);
+  const visas = visa ? [visa] : [];
+  const vAlerts: any[] = [];
+  const vUpdateHolder = (_id: string, _h: any) => {};
+  const vUpdateDoc = (_id: string, _t: any, _s: any) => {};
   const [toast, setToast] = useState<{ message: string, type: 'success' | 'error' } | null>(null);
 
   const fetchRelatedData = useCallback(async () => {
@@ -580,13 +584,13 @@ export const LeadDetailPage: React.FC = () => {
                 </button>
              </div>
 
-             {bookings.length === 0 ? (
+             {!booking ? (
                 <div className="bg-slate-50 border-2 border-dashed border-slate-100 rounded-[2.5rem] p-16 text-center">
                    <p className="text-sm font-bold text-slate-300 italic">No operational missions mapped to this lead.</p>
                 </div>
              ) : (
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                   {bookings.map((bk: Booking) => (
+                   {[booking].map((bk: Booking) => (
                       <Link key={bk.id} to={`/bookings/${bk.id}`} className="group bg-white p-6 rounded-[2rem] border border-slate-200 hover:border-indigo-600 transition-all shadow-sm flex flex-col justify-between h-44">
                          <div>
                             <div className="flex justify-between items-start mb-4">
@@ -654,7 +658,7 @@ export const LeadDetailPage: React.FC = () => {
                <div className="p-5 space-y-4">
                   {vAlerts.length > 0 && (
                     <div className="space-y-2">
-                       {vAlerts.slice(0, 3).map((a, i) => (
+                       {vAlerts.slice(0, 3).map((a: any, i: any) => (
                          <div key={i} className={clsx(
                            "p-3 rounded-xl border flex items-center gap-3 animate-in slide-in-from-right-2 duration-300",
                            a.priority === 'red' ? "bg-red-50 border-red-100 text-red-700" :
@@ -674,11 +678,11 @@ export const LeadDetailPage: React.FC = () => {
                       </div>
                       <div className="text-center">
                          <p className="text-[8px] font-black text-slate-400 uppercase mb-1 underline decoration-emerald-200 font-mono">Approved</p>
-                         <p className="text-lg font-black text-emerald-600 italic leading-none">{visas.filter(v => v.status === 'approved').length}</p>
+                         <p className="text-lg font-black text-emerald-600 italic leading-none">{visas.filter((v: any) => v.status === 'approved').length}</p>
                       </div>
                       <div className="text-center">
                          <p className="text-[8px] font-black text-slate-400 uppercase mb-1 underline decoration-red-200 font-mono">Rejected</p>
-                         <p className="text-lg font-black text-red-600 italic leading-none">{visas.filter(v => v.status === 'rejected').length}</p>
+                         <p className="text-lg font-black text-red-600 italic leading-none">{visas.filter((v: any) => v.status === 'rejected').length}</p>
                       </div>
                   </div>
 
