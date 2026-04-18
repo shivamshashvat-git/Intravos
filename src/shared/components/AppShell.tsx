@@ -19,8 +19,7 @@ import {
   Stamp
 } from 'lucide-react';
 import { useAuth } from '@/core/hooks/useAuth';
-import { useNotifications } from '@/core/hooks/useNotifications';
-import { NotificationDropdown } from '@/shared/components/NotificationBell';
+import { NotificationBell } from '@/shared/components/NotificationBell';
 import { supabase } from '@/core/lib/supabase';
 import { clsx } from 'clsx';
 import { twMerge } from 'tailwind-merge';
@@ -33,8 +32,6 @@ function cn(...inputs: any[]) {
 export const AppShell: React.FC = () => {
   const { user, tenant } = useAuth();
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
-  const [isNotifOpen, setIsNotifOpen] = useState(false);
-  const { unreadCount } = useNotifications();
   const navigate = useNavigate();
   const location = useLocation();
 
@@ -188,20 +185,7 @@ export const AppShell: React.FC = () => {
           </div>
 
           <div className="flex items-center gap-6">
-            <div className="relative">
-               <button 
-                 onClick={() => setIsNotifOpen(!isNotifOpen)}
-                 className="relative p-2 text-slate-400 hover:text-slate-600 transition-colors"
-               >
-                 <Bell className="w-5 h-5" />
-                 {unreadCount > 0 && (
-                   <span className="absolute top-1.5 right-1.5 min-w-[16px] h-4 px-1 bg-indigo-600 rounded-full ring-2 ring-white text-[8px] font-black text-white flex items-center justify-center">
-                      {unreadCount > 9 ? '9+' : unreadCount}
-                   </span>
-                 )}
-               </button>
-               {isNotifOpen && <NotificationDropdown onClose={() => setIsNotifOpen(false)} />}
-            </div>
+            <NotificationBell />
             <div className="h-8 w-px bg-slate-200"></div>
             <div className="flex items-center gap-3 group cursor-pointer">
               <div className="text-right hidden sm:block">

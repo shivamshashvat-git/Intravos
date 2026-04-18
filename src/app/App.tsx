@@ -19,6 +19,7 @@ import { SettingsPage as Settings } from '@/features/settings/pages/SettingsPage
 import { BookingsPage as Bookings } from '@/features/operations/pages/BookingsPage';
 import { BookingDetailPage as BookingDetail } from '@/features/operations/pages/BookingDetailPage';
 import { TasksPage as Tasks } from '@/features/tasks/pages/TasksPage';
+import { NotificationsPage as Notifications } from '@/features/tasks/pages/NotificationsPage';
 import { ItinerariesPage as Itineraries } from '@/features/operations/pages/ItinerariesPage';
 import { ItineraryBuilderPage as ItineraryBuilder } from '@/features/operations/pages/ItineraryBuilderPage';
 import { PublicItineraryPage as PublicItinerary } from '@/features/public/pages/PublicItineraryPage';
@@ -59,6 +60,7 @@ const App: React.FC = () => {
             <Route path="/itineraries/:id/edit" element={<ItineraryBuilder />} />
             <Route path="/visa" element={<VisaTracking />} />
             <Route path="/tasks" element={<Tasks />} />
+            <Route path="/notifications" element={<Notifications />} />
             <Route path="/settings" element={<Settings />} />
           </Route>
 

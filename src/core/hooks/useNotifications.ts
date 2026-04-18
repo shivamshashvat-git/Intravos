@@ -7,17 +7,31 @@ export function useNotifications() {
   const { user, tenant } = useAuth();
   const [notifications, setNotifications] = useState<Notification[]>([]);
   const [unreadCount, setUnreadCount] = useState(0);
+  const [isLoading, setIsLoading] = useState(false);
 
-  const fetchNotifs = useCallback(async () => {
+  const fetchUnreadCount = useCallback(async () => {
     if (!user || !tenant) return;
     try {
-      const data = await notificationsService.getUnreadNotifications(user.id, tenant.id);
-      setNotifications(data);
-      setUnreadCount(data.length);
+      const count = await notificationsService.getUnreadCount(user.id, tenant.id);
+      setUnreadCount(count);
     } catch (e) {
       console.error(e);
     }
   }, [user, tenant]);
+
+  const fetchNotifs = useCallback(async () => {
+    if (!user || !tenant) return;
+    setIsLoading(true);
+    try {
+      const data = await notificationsService.getUnreadNotifications(user.id, tenant.id);
+      setNotifications(data);
+      await fetchUnreadCount();
+    } catch (e) {
+      console.error(e);
+    } finally {
+      setIsLoading(false);
+    }
+  }, [user, tenant, fetchUnreadCount]);
 
   useEffect(() => {
     fetchNotifs();
@@ -33,33 +47,61 @@ export function useNotifications() {
       }, (payload) => {
         setNotifications(prev => [payload.new as Notification, ...prev]);
         setUnreadCount(c => c + 1);
-        // Toast could be triggered here
+      })
+      .on('postgres_changes', {
+        event: 'UPDATE',
+        schema: 'public',
+        table: 'notifications',
+        filter: `user_id=eq.${user.id}`
+      }, () => {
+        fetchUnreadCount();
       })
       .subscribe();
 
     return () => {
       supabase.removeChannel(channel);
     };
-  }, [user, fetchNotifs]);
+  }, [user, fetchNotifs, fetchUnreadCount]);
 
   const markRead = async (id: string) => {
-    await notificationsService.markAsRead(id);
-    setNotifications(prev => prev.filter(n => n.id !== id));
-    setUnreadCount(c => Math.max(0, c - 1));
+    try {
+      await notificationsService.markAsRead(id);
+      setNotifications(prev => prev.map(n => n.id === id ? { ...n, is_read: true } : n));
+      setUnreadCount(c => Math.max(0, c - 1));
+    } catch (e) {
+      console.error(e);
+    }
   };
 
   const markAllRead = async () => {
     if (!user || !tenant) return;
-    await notificationsService.markAllAsRead(user.id, tenant.id);
-    setNotifications([]);
-    setUnreadCount(0);
+    try {
+      await notificationsService.markAllAsRead(user.id, tenant.id);
+      setNotifications(prev => prev.map(n => ({ ...n, is_read: true })));
+      setUnreadCount(0);
+    } catch (e) {
+      console.error(e);
+    }
+  };
+
+  const deleteNotification = async (id: string) => {
+    try {
+      await notificationsService.deleteNotification(id);
+      setNotifications(prev => prev.filter(n => n.id !== id));
+      // Refresh count if it was unread
+      await fetchUnreadCount();
+    } catch (e) {
+      console.error(e);
+    }
   };
 
   return {
     notifications,
     unreadCount,
+    isLoading,
     markRead,
     markAllRead,
+    deleteNotification,
     refresh: fetchNotifs
   };
 }
