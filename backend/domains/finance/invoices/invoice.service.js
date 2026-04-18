@@ -1,6 +1,6 @@
 import { supabaseAdmin } from '../../../providers/database/supabase.js';
 import financialService from '../shared/financialService.js';
-import seedService from '../../system/system/seedService.js';
+import quotationService from '../quotations/quotation.service.js';
 
 /**
  * InvoiceService — Financial Orchestration & GST Compliance
@@ -86,8 +86,8 @@ class InvoiceService {
     // Update Lead to 'booked' state
     await supabaseAdmin.from('leads').update({ 
       status: 'booked', 
-      final_price: quotation.total, 
-      vendor_cost: quotation.total_vendor_cost, 
+      selling_price: quotation.total, 
+      cost_price: quotation.total_cost_price, 
       margin: quotation.total_margin 
     }).eq('id', quotation.lead_id);
 
@@ -122,7 +122,6 @@ class InvoiceService {
 
     if (error) throw error;
     
-    // Aggregation logic moved from controller...
     const byMonth = {};
     for (const inv of data) {
       const d = new Date(inv.created_at);
@@ -136,9 +135,6 @@ class InvoiceService {
     return Object.values(byMonth).sort((a, b) => a.month.localeCompare(b.month));
   }
 
-  /**
-   * List invoices with multi-tenant filtering and pagination
-   */
   async listInvoices(tenantId, filters) {
     const { status, invoice_type, lead_id, customer_id, from, to, financial_year, page = 1, limit = 50 } = filters;
     
@@ -164,42 +160,65 @@ class InvoiceService {
     return { invoices: data, total: count, page: parseInt(page, 10) };
   }
 
-  /**
-   * Assemble data for secure public invoice sharing
-   */
+  async updateInvoice(tenantId, invoiceId, updates) {
+    const { data, error } = await supabaseAdmin
+      .from('invoices')
+      .update(updates)
+      .eq('id', invoiceId)
+      .eq('tenant_id', tenantId)
+      .select()
+      .single();
+    if (error) throw error;
+    return data;
+  }
+
+  async deleteInvoice(tenantId, invoiceId) {
+    const { error } = await supabaseAdmin
+      .from('invoices')
+      .update({ deleted_at: new Date().toISOString() })
+      .eq('id', invoiceId)
+      .eq('tenant_id', tenantId);
+    if (error) throw error;
+    return { success: true };
+  }
+
+  async createCreditNote(tenantId, userId, parentInvoiceId, payload) {
+    const original = await this.getById(tenantId, parentInvoiceId);
+    if (!original) throw new Error('Invoice not found');
+
+    // Basic inversion logic for credit note
+    const cn = await this.createInvoice(tenantId, userId, {
+      ...payload,
+      customer_id: original.customer_id,
+      invoice_type: 'credit_note',
+      parent_invoice_id: parentInvoiceId
+    });
+
+    return cn;
+  }
+
   async getPublicInvoiceShare(invoiceIdOrToken) {
-    // Note: In simple mode, invoiceId is used as token
-    const invoice = await this.getById(null, invoiceIdOrToken);
+    const { data: invoice } = await supabaseAdmin.from('invoices').select('*, invoice_items(*)').eq('id', invoiceIdOrToken).single();
     if (!invoice) return null;
 
     const { data: tenant } = await supabaseAdmin
       .from('tenants')
-      .select('name, logo_url, primary_color, secondary_color, agency_address, agency_phone, agency_email, agency_website, gstin, pan, invoice_bank_text')
+      .select('name, agency_address, agency_phone, agency_email, gstin, pan, invoice_bank_text')
       .eq('id', invoice.tenant_id)
       .single();
 
     return { invoice, tenant_branding: tenant };
   }
 
-  /**
-   * Fetch and shape data for GSTR-1 accountant export
-   */
   async getGstr1Data(tenantId, filters) {
-    const { from, to, financial_year } = filters;
-    
-    let query = supabaseAdmin
+    const { financial_year } = filters;
+    const { data, error } = await supabaseAdmin
       .from('invoices')
-      .select('invoice_number, created_at, customer_name, customer_gstin, place_of_supply, subtotal, cgst, sgst, igst, total, status')
+      .select('invoice_number, created_at, customer_name, customer_gstin, subtotal, cgst, sgst, igst, total')
       .eq('tenant_id', tenantId)
-      .is('deleted_at', null)
-      .not('status', 'eq', 'cancelled')
-      .order('created_at', { ascending: true });
+      .eq('financial_year', financial_year || financialService.getCurrentFinancialYear())
+      .is('deleted_at', null);
 
-    if (from) query = query.gte('created_at', from);
-    if (to) query = query.lte('created_at', to);
-    if (financial_year) query = query.eq('financial_year', financial_year);
-
-    const { data, error } = await query;
     if (error) throw error;
     return data || [];
   }

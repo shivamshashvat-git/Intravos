@@ -9,7 +9,10 @@ import { supabaseAdmin } from '../../../providers/database/supabase.js';
  */
 class InvoicesController {
   
-  async get__0(req, res, next) {
+  /**
+   * List all invoices for the tenant
+   */
+  async listInvoices(req, res, next) {
     try {
       const data = await invoiceService.listInvoices(req.user.tenantId, req.query);
       return response.success(res, data);
@@ -18,7 +21,10 @@ class InvoicesController {
     }
   }
 
-  async get_gst_summary_1(req, res, next) {
+  /**
+   * Fetch aggregate GST liability data
+   */
+  async getGstSummary(req, res, next) {
     try {
       const { financial_year } = req.query;
       const summary = await invoiceService.getGstSummary(req.user.tenantId, financial_year);
@@ -31,7 +37,10 @@ class InvoicesController {
     }
   }
 
-  async get_share__token_9(req, res, next) {
+  /**
+   * Secure public view for customer
+   */
+  async getPublicInvoiceShare(req, res, next) {
     try {
       const result = await invoiceService.getPublicInvoiceShare(req.params.token);
       if (!result) return response.error(res, 'Invoice not found', 404);
@@ -41,7 +50,10 @@ class InvoicesController {
     }
   }
 
-  async get_id_2(req, res, next) {
+  /**
+   * Fetch single invoice with items
+   */
+  async getInvoiceById(req, res, next) {
     try {
       const invoice = await invoiceService.getById(req.user.tenantId, req.params.id);
       if (!invoice) return response.error(res, 'Invoice not found', 404);
@@ -51,7 +63,10 @@ class InvoicesController {
     }
   }
 
-  async post__5(req, res, next) {
+  /**
+   * Generate a manual tax invoice
+   */
+  async createInvoice(req, res, next) {
     try {
       const invoice = await invoiceService.createInvoice(req.user.tenantId, req.user.id, req.body);
       return response.success(res, { invoice }, 'Invoice created', 201);
@@ -60,7 +75,10 @@ class InvoicesController {
     }
   }
 
-  async get_id_pdf_4(req, res, next) {
+  /**
+   * Generate Invoice PDF
+   */
+  async getInvoicePdf(req, res, next) {
     try {
       const invoice = await invoiceService.getById(req.user.tenantId, req.params.id);
       if (!invoice) return response.error(res, 'Invoice not found', 404);
@@ -77,7 +95,10 @@ class InvoicesController {
     }
   }
 
-  async patch_id(req, res, next) {
+  /**
+   * Update invoice metadata (Status, Payment Note)
+   */
+  async updateInvoice(req, res, next) {
     try {
       const invoice = await invoiceService.updateInvoice(req.user.tenantId, req.params.id, req.body);
       return response.success(res, { invoice }, 'Invoice updated');
@@ -86,7 +107,10 @@ class InvoicesController {
     }
   }
 
-  async delete_id(req, res, next) {
+  /**
+   * Archive / Void invoice
+   */
+  async deleteInvoice(req, res, next) {
     try {
       await invoiceService.deleteInvoice(req.user.tenantId, req.params.id);
       return response.success(res, null, 'Invoice removed from records');
@@ -95,11 +119,12 @@ class InvoicesController {
     }
   }
 
-  async get_gstr1_export(req, res, next) {
+  /**
+   * Accountant CSV Export (GSTR-1)
+   */
+  async getGstr1Export(req, res, next) {
     try {
       const data = await invoiceService.getGstr1Data(req.user.tenantId, req.query);
-
-      // Industrialized CSV Builder
       const header = 'GSTIN,Receiver,Invoice No,Date,Total,Taxable,CGST,SGST,IGST';
       const rows = data.map(i => [
         i.customer_gstin || '',
@@ -114,8 +139,37 @@ class InvoicesController {
       ].join(','));
 
       res.setHeader('Content-Type', 'text/csv');
-      res.setHeader('Content-Disposition', `attachment; filename="GSTR1-${req.query.financial_year || 'export'}.csv"`);
+      res.setHeader('Content-Disposition', `attachment; filename="GSTR1-Export.csv"`);
       res.status(200).send([header, ...rows].join('\n'));
+    } catch (error) {
+      next(error);
+    }
+  }
+
+  /**
+   * Issue Credit Note for an existing invoice
+   */
+  async createCreditNote(req, res, next) {
+    try {
+      const creditNote = await invoiceService.createCreditNote(req.user.tenantId, req.user.id, req.params.id, req.body);
+      return response.success(res, creditNote, 'Credit Note issued successfully', 201);
+    } catch (error) {
+      next(error);
+    }
+  }
+
+  /**
+   * Stubs for non-persistence logic referred to in routes
+   */
+  async getInvoiceAuditTrail(req, res, next) {
+    return response.error(res, 'Audit trail logic not yet ported to industrialized controller', 501);
+  }
+
+  async getInvoicePdfData(req, res, next) {
+    try {
+      const invoice = await invoiceService.getById(req.user.tenantId, req.params.id);
+      if (!invoice) return response.error(res, 'Invoice not found', 404);
+      return response.success(res, { invoice });
     } catch (error) {
       next(error);
     }

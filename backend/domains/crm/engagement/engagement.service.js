@@ -57,7 +57,7 @@ class EngagementService {
       .eq('tenant_id', tenantId)
       .is('deleted_at', null)
       .eq('checkin_date', todayStr)
-      .not('status', 'in', '("cancelled")');
+      .not('status', 'in', ['cancelled']);
 
     const mappedDepartures = (departures || []).map(item => {
       const msg = `Hi ${item.customer_name}, wishing you a smooth trip to ${item.destination || 'your destination'}!`;

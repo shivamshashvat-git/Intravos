@@ -49,7 +49,7 @@ class PredictiveService {
   async forecastRevenue(tenantId) {
     const { data: leads, error } = await supabaseAdmin
       .from('leads')
-      .select('final_price, status, budget')
+      .select('selling_price, status, budget')
       .eq('tenant_id', tenantId)
       .is('deleted_at', null)
       .not('status', 'eq', 'lost');
@@ -60,7 +60,7 @@ class PredictiveService {
     let projection = 0;
 
     leads.forEach(lead => {
-      const price = parseFloat(lead.final_price) || parseFloat(lead.budget) || 0;
+      const price = parseFloat(lead.selling_price) || parseFloat(lead.budget) || 0;
       
       if (lead.status === 'booked') {
         confirmedRevenue += price;

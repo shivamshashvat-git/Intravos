@@ -30,6 +30,7 @@ class QuotationService {
       .from('quotations')
       .insert({
         tenant_id: tenantId,
+        lead_id: lead_id,
         customer_id: lead.customer_id,
         quote_number: quoteNumber,
         customer_name: lead.customer_name,
@@ -48,7 +49,7 @@ class QuotationService {
         sgst: fin.sgst, 
         igst: fin.igst, 
         total: fin.total,
-        total_vendor_cost: fin.totalVendorCost,
+        total_cost_price: fin.totalVendorCost,
         total_margin: fin.totalMargin,
         inclusions: inclusions || tenant.quote_inclusions,
         exclusions: exclusions || tenant.quote_exclusions,
@@ -70,7 +71,7 @@ class QuotationService {
       amount: item.amount,
       gst_rate: item.gst_rate,
       gst_amount: item.gst_amount,
-      vendor_cost: item.vendor_cost,
+      cost_price: item.cost_price,
       sort_order: item.sort_order
     }));
 
@@ -243,7 +244,7 @@ class QuotationService {
         sgst: fin.sgst,
         igst: fin.igst,
         total: fin.total,
-        total_vendor_cost: fin.totalVendorCost,
+        total_cost_price: fin.totalVendorCost,
         total_margin: fin.totalMargin
       };
 
@@ -254,7 +255,7 @@ class QuotationService {
         item_type: item.type || 'other',
         description: item.description,
         amount: item.amount,
-        vendor_cost: item.vendor_cost,
+        cost_price: item.cost_price,
         sort_order: item.sort_order
       }));
       await supabaseAdmin.from('quotation_items').insert(newItems);
@@ -263,8 +264,8 @@ class QuotationService {
       // Industrial Logic: Automatically update the Lead's projected revenue and margin
       // This ensures CRM dashboards are accurate without manual intervention.
       await supabaseAdmin.from('leads').update({
-        final_price: fin.total,
-        vendor_cost: fin.totalVendorCost,
+        selling_price: fin.total,
+        cost_price: fin.totalVendorCost,
         margin: fin.totalMargin,
         updated_at: new Date().toISOString()
       }).eq('id', current.lead_id);

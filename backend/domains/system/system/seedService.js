@@ -155,7 +155,7 @@ class SeedService {
                   star_rating: item.star_rating,
                   check_in: item.check_in,
                   check_out: item.check_out,
-                  vendor_cost: item.vendor_cost || 0,
+                  cost_price: item.cost_price || 0,
                   sort_order: idx
                 }));
 

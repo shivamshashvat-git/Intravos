@@ -18,7 +18,7 @@ const quotationItemSchema = z.object({
   description: z.string().min(1, 'Description is required'),
   sac_code: z.string().optional(),
   amount: z.number().min(0),
-  vendor_cost: z.number().min(0).optional(),
+  cost_price: z.number().min(0).optional(),
   gst_rate: z.number().min(0).optional(),
 });
 

@@ -18,10 +18,6 @@ router.use('/auth', authRoutes);
 router.use('/public', publicRoutes);
 router.use('/cron', cronRoutes);
 
-// ── Lifecycle Protection ────────────────────────────────────
-// Secure all tenant-scoped industrial logic behind Subscription Gate
-router.use(enforceSubscription);
-
 // ── Tenant Scoped Domains ───────────────────────────────────
 router.use('/crm', crmRoutes);
 router.use('/operations', operationsRoutes);

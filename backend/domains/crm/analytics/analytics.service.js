@@ -41,15 +41,15 @@ class AnalyticsService {
     // Industrialized aggregation
     const { data: summary, error } = await supabaseAdmin
       .from('leads')
-      .select('final_price, vendor_cost, profit, amount_collected, status')
+      .select('selling_price, cost_price, profit, amount_collected, status')
       .eq('tenant_id', tenantId)
       .is('deleted_at', null)
       .in('status', ['booked', 'completed']);
 
     if (error) throw error;
 
-    const totalRevenue = summary.reduce((sum, l) => sum + (parseFloat(l.final_price) || 0), 0);
-    const totalCost = summary.reduce((sum, l) => sum + (parseFloat(l.vendor_cost) || 0), 0);
+    const totalRevenue = summary.reduce((sum, l) => sum + (parseFloat(l.selling_price) || 0), 0);
+    const totalCost = summary.reduce((sum, l) => sum + (parseFloat(l.cost_price) || 0), 0);
     const totalProfit = summary.reduce((sum, l) => sum + (parseFloat(l.profit) || 0), 0);
     const totalCollected = summary.reduce((sum, l) => sum + (parseFloat(l.amount_collected) || 0), 0);
 

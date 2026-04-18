@@ -28,7 +28,7 @@ class FinancialService {
 
     const processedItems = items.map((item, index) => {
       const amount = toAmount(item.amount);
-      const vendorCost = toAmount(item.vendor_cost);
+      const vendorCost = toAmount(item.cost_price);
       const rate = toAmount(item.gst_rate) || defaultRate;
       
       const gstAmount = (amount * rate) / 100;
@@ -38,7 +38,7 @@ class FinancialService {
       return {
         ...item,
         amount,
-        vendor_cost: vendorCost,
+        cost_price: vendorCost,
         gst_rate: rate,
         gst_amount: gstAmount,
         sort_order: index

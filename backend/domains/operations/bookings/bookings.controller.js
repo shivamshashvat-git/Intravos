@@ -8,7 +8,10 @@ import { supabaseAdmin } from '../../../providers/database/supabase.js';
  */
 class BookingsController {
   
-  async get__0(req, res, next) {
+  /**
+   * List bookings with filters
+   */
+  async listBookings(req, res, next) {
     try {
       const data = await bookingService.listBookings(req.user.tenantId, req.query);
       return response.success(res, data);
@@ -17,7 +20,10 @@ class BookingsController {
     }
   }
 
-  async get_id_hub(req, res, next) {
+  /**
+   * Fetch complete Booking Hub (Details + Timeline)
+   */
+  async getBookingHub(req, res, next) {
     try {
       const hub = await bookingService.getBookingHub(req.user.tenantId, req.params.id);
       if (!hub) return response.error(res, 'Booking not found', 404);
@@ -27,7 +33,10 @@ class BookingsController {
     }
   }
 
-  async post__3(req, res, next) {
+  /**
+   * Create a new booking
+   */
+  async createBooking(req, res, next) {
     try {
       const booking = await bookingService.createBooking(req.user.tenantId, req.user.id, req.body);
       return response.success(res, { booking }, 'Booking created', 201);
@@ -36,7 +45,10 @@ class BookingsController {
     }
   }
 
-  async patch_id_4(req, res, next) {
+  /**
+   * Update booking state/details
+   */
+  async updateBooking(req, res, next) {
     try {
       const booking = await bookingService.updateBooking(req.user.tenantId, req.params.id, req.body);
       return response.success(res, { booking }, 'Booking updated');
@@ -45,7 +57,10 @@ class BookingsController {
     }
   }
 
-  async post_id_services_6(req, res, next) {
+  /**
+   * Add a service/item to a booking
+   */
+  async addBookingService(req, res, next) {
     try {
       const service = await bookingService.addService(req.user.tenantId, req.params.id, req.body);
       return response.success(res, { service }, 'Service added to booking', 201);
@@ -54,7 +69,24 @@ class BookingsController {
     }
   }
 
-  async get_id_services__serviceId_voucher_pdf_9(req, res, next) {
+  /**
+   * Update specific booking service
+   */
+  async updateBookingService(req, res, next) {
+    return response.error(res, 'Method not implemented', 501);
+  }
+
+  /**
+   * Remove service from booking
+   */
+  async deleteBookingService(req, res, next) {
+    return response.error(res, 'Method not implemented', 501);
+  }
+
+  /**
+   * Generate Service Voucher PDF
+   */
+  async getServiceVoucherPdf(req, res, next) {
     try {
       const hub = await bookingService.getBookingHub(req.user.tenantId, req.params.id);
       if (!hub) return response.error(res, 'Booking not found', 404);
@@ -73,7 +105,24 @@ class BookingsController {
     }
   }
 
-  async delete_id(req, res, next) {
+  /**
+   * Generate full Travel Pack PDF
+   */
+  async getTravelPackPdf(req, res, next) {
+    return response.error(res, 'Method not implemented', 501);
+  }
+
+  /**
+   * Process booking cancellation
+   */
+  async cancelBooking(req, res, next) {
+    return response.error(res, 'Cancellation logic requires specialized workflow implementation', 501);
+  }
+
+  /**
+   * Soft-delete/Archive booking
+   */
+  async deleteBooking(req, res, next) {
     try {
       await bookingService.deleteBooking(req.user.tenantId, req.params.id);
       return response.success(res, null, 'Booking removed from records');
@@ -82,7 +131,10 @@ class BookingsController {
     }
   }
 
-  async get_pnr_tracker_1(req, res, next) {
+  /**
+   * List global PNRs for tracker
+   */
+  async getPnrTracker(req, res, next) {
     try {
       const tracker = await bookingService.getPnrTracker(req.user.tenantId, req.query);
       return response.success(res, { tracker });

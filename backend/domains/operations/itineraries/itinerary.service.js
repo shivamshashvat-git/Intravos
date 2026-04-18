@@ -27,6 +27,9 @@ class ItineraryService {
     return { itineraries: data, total: count, page: parseInt(page) };
   }
 
+  /**
+   * Fetch exhaustive itinerary tree with strict soft-delete filtering
+   */
   async getItineraryById(tenantId, itineraryId) {
     const { data: itin, error } = await supabaseAdmin
       .from('itineraries')
@@ -39,11 +42,18 @@ class ItineraryService {
     if (error) throw error;
     if (!itin) return null;
 
-    // Sort the tree
+    // Industrial Hydration: Filter out soft-deleted children and grandchildren
     if (itin.itinerary_days) {
-      itin.itinerary_days.sort((a, b) => a.sort_order - b.sort_order);
+      itin.itinerary_days = itin.itinerary_days
+        .filter(day => !day.deleted_at)
+        .sort((a, b) => a.sort_order - b.sort_order);
+
       itin.itinerary_days.forEach(day => {
-        if (day.itinerary_items) day.itinerary_items.sort((a, b) => a.sort_order - b.sort_order);
+        if (day.itinerary_items) {
+          day.itinerary_items = day.itinerary_items
+            .filter(item => !item.deleted_at)
+            .sort((a, b) => a.sort_order - b.sort_order);
+        }
       });
     }
 
@@ -131,6 +141,107 @@ class ItineraryService {
 
     if (error || !data) throw new Error('Itinerary not found or sharing disabled');
     return data;
+  }
+
+  async deleteItinerary(tenantId, userId, itineraryId) {
+    const { data, error } = await supabaseAdmin
+      .from('itineraries')
+      .update({ deleted_at: new Date().toISOString(), deleted_by: userId })
+      .eq('id', itineraryId)
+      .eq('tenant_id', tenantId)
+      .select()
+      .single();
+
+    if (error) throw error;
+    return data;
+  }
+
+  async addDay(tenantId, itineraryId, payload) {
+    const { data, error } = await supabaseAdmin
+      .from('itinerary_days')
+      .insert({ ...payload, itinerary_id: itineraryId })
+      .select()
+      .single();
+
+    if (error) throw error;
+    return data;
+  }
+
+  async updateDay(tenantId, dayId, updates) {
+    const { data, error } = await supabaseAdmin
+      .from('itinerary_days')
+      .update(updates)
+      .eq('id', dayId)
+      .select()
+      .single();
+
+    if (error) throw error;
+    return data;
+  }
+
+  async deleteDay(tenantId, dayId) {
+    const { data, error } = await supabaseAdmin
+      .from('itinerary_days')
+      .update({ deleted_at: new Date().toISOString() })
+      .eq('id', dayId)
+      .select()
+      .single();
+
+    if (error) throw error;
+    return data;
+  }
+
+  async addItem(tenantId, dayId, payload) {
+    const { data, error } = await supabaseAdmin
+      .from('itinerary_items')
+      .insert({ ...payload, day_id: dayId })
+      .select()
+      .single();
+
+    if (error) throw error;
+    return data;
+  }
+
+  async updateItem(tenantId, itemId, updates) {
+    const { data, error } = await supabaseAdmin
+      .from('itinerary_items')
+      .update(updates)
+      .eq('id', itemId)
+      .select()
+      .single();
+
+    if (error) throw error;
+    return data;
+  }
+
+  async deleteItem(tenantId, itemId) {
+    const { data, error } = await supabaseAdmin
+      .from('itinerary_items')
+      .update({ deleted_at: new Date().toISOString() })
+      .eq('id', itemId)
+      .select()
+      .single();
+
+    if (error) throw error;
+    return data;
+  }
+
+  /**
+   * Bulk synchronizes day sort order
+   */
+  async reorderDays(tenantId, itineraryId, orderedIds) {
+    if (!Array.isArray(orderedIds)) throw new Error('orderedIds must be an array');
+
+    const updates = orderedIds.map((id, index) => 
+      supabaseAdmin
+        .from('itinerary_days')
+        .update({ sort_order: index })
+        .eq('id', id)
+        .eq('itinerary_id', itineraryId)
+    );
+
+    await Promise.all(updates);
+    return { success: true };
   }
 }
 

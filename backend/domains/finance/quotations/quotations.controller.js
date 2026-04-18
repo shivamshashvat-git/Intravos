@@ -30,8 +30,8 @@ class QuotationsController {
       if (!data) return response.error(res, 'Quotation details could not be loaded', 404);
 
       // Secure costing context (strip margins for public view)
-      const { total_vendor_cost, total_margin, ...publicData } = data;
-      publicData.quotation_items = (data.quotation_items || []).map(({ vendor_cost, ...item }) => item);
+      const { total_cost_price, total_margin, ...publicData } = data;
+      publicData.quotation_items = (data.quotation_items || []).map(({ cost_price, ...item }) => item);
 
       return response.success(res, { quotation: publicData, is_redirected: targetQuote.id !== token });
     } catch (error) {

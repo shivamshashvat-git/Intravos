@@ -4,14 +4,19 @@ import path from 'path';
 const schemaDir = path.join(process.cwd(), 'schema');
 const outputFile = path.join(process.cwd(), 'compiled-schema.sql');
 
+// ── SCHEMA DEPENDENCY MAP ────────────────────────────────────
+// 00 -> 07 is a strictly ordered sequence.
+// CRITICAL: Phase 05 (Operations) depends on Phase 06 (Marketplace) 
+// for 'booking_services' and 'suppliers' definitions.
+// ─────────────────────────────────────────────────────────────
 const filesToCompile = [
   '00-base-enums-and-extensions.sql',
   '01-super-admin-hud.sql',
   '02-tenant-foundation.sql',
   '03-tenant-crm.sql',
   '04-tenant-finance.sql',
+  '06-global-marketplace.sql', // Promoted to 06-before-05 logically if strictly sequential manually
   '05-tenant-operations.sql',
-  '06-global-marketplace.sql',
   '07-security-rls.sql'
 ];
 

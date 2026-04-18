@@ -14,7 +14,7 @@ class VisaService {
     const { lead_id, customer_id, status, page = 1, limit = 50, search } = filters;
 
     let query = supabaseAdmin
-      .from('visas')
+      .from('visa_tracking')
       .select('*, customers(name, phone), leads(destination)', { count: 'exact' })
       .eq('tenant_id', tenantId)
       .is('deleted_at', null)
@@ -40,7 +40,7 @@ class VisaService {
    */
   async getRecord(tenantId, recordId) {
     const { data: visa, error } = await supabaseAdmin
-      .from('visas')
+      .from('visa_tracking')
       .select('*, customers(*), leads(*)')
       .eq('id', recordId)
       .eq('tenant_id', tenantId)
@@ -65,7 +65,7 @@ class VisaService {
    */
   async createRecord(tenantId, payload) {
     const { data, error } = await supabaseAdmin
-      .from('visas')
+      .from('visa_tracking')
       .insert({
         ...payload,
         tenant_id: tenantId,
@@ -87,7 +87,7 @@ class VisaService {
     delete updates.tenant_id;
 
     const { data, error } = await supabaseAdmin
-      .from('visas')
+      .from('visa_tracking')
       .update(updates)
       .eq('id', recordId)
       .eq('tenant_id', tenantId)

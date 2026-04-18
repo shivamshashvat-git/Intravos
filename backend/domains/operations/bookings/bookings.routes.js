@@ -12,28 +12,28 @@ const router = express.Router();
  */
 
 // List & Tracker
-router.get('/', authenticate, requireStaff(), requireFeature('bookings'), asyncHandler(bookingsController.get__0));
-router.get('/pnr-tracker', authenticate, requireStaff(), requireFeature('bookings'), asyncHandler(bookingsController.get_pnr_tracker_1));
+router.get('/', authenticate, requireStaff(), requireFeature('bookings'), asyncHandler(bookingsController.listBookings));
+router.get('/pnr-tracker', authenticate, requireStaff(), requireFeature('bookings'), asyncHandler(bookingsController.getPnrTracker));
 
 // Hub & Detail
-router.get('/:id/hub', authenticate, requireStaff(), requireFeature('bookings'), asyncHandler(bookingsController.get_id_hub));
-router.get('/:id', authenticate, requireStaff(), requireFeature('bookings'), asyncHandler(bookingsController.get_id_hub)); // v1 alias to hub
+router.get('/:id/hub', authenticate, requireStaff(), requireFeature('bookings'), asyncHandler(bookingsController.getBookingHub));
+router.get('/:id', authenticate, requireStaff(), requireFeature('bookings'), asyncHandler(bookingsController.getBookingHub)); // v1 alias to hub
 
 // Lifecycle
-router.post('/', authenticate, requireStaff(), requireWriteAccess, requireFeature('bookings'), asyncHandler(bookingsController.post__3));
-router.patch('/:id', authenticate, requireStaff(), requireWriteAccess, requireFeature('bookings'), asyncHandler(bookingsController.patch_id_4));
-router.delete('/:id', authenticate, requireAdmin(), requireWriteAccess, requireFeature('bookings'), asyncHandler(bookingsController.delete_id_5));
+router.post('/', authenticate, requireStaff(), requireWriteAccess, requireFeature('bookings'), asyncHandler(bookingsController.createBooking));
+router.patch('/:id', authenticate, requireStaff(), requireWriteAccess, requireFeature('bookings'), asyncHandler(bookingsController.updateBooking));
+router.delete('/:id', authenticate, requireAdmin(), requireWriteAccess, requireFeature('bookings'), asyncHandler(bookingsController.deleteBooking));
 
 // Services Management
-router.post('/:id/services', authenticate, requireStaff(), requireWriteAccess, requireFeature('bookings'), asyncHandler(bookingsController.post_id_services_6));
-router.patch('/:id/services/:serviceId', authenticate, requireStaff(), requireWriteAccess, requireFeature('bookings'), asyncHandler(bookingsController.patch_id_services__serviceId_7));
-router.delete('/:id/services/:serviceId', authenticate, requireAdmin(), requireWriteAccess, requireFeature('bookings'), asyncHandler(bookingsController.delete_id_services__serviceId_8));
+router.post('/:id/services', authenticate, requireStaff(), requireWriteAccess, requireFeature('bookings'), asyncHandler(bookingsController.addBookingService));
+router.patch('/:id/services/:serviceId', authenticate, requireStaff(), requireWriteAccess, requireFeature('bookings'), asyncHandler(bookingsController.updateBookingService));
+router.delete('/:id/services/:serviceId', authenticate, requireAdmin(), requireWriteAccess, requireFeature('bookings'), asyncHandler(bookingsController.deleteBookingService));
 
 // Documents & PDFs
-router.get('/:id/services/:serviceId/voucher/pdf', authenticate, requireStaff(), requireFeature('bookings'), asyncHandler(bookingsController.get_id_services__serviceId_voucher_pdf_9));
-router.get('/:id/travel-pack/pdf', authenticate, requireStaff(), requireFeature('bookings'), asyncHandler(bookingsController.get_id_travel_pack_pdf_11));
+router.get('/:id/services/:serviceId/voucher/pdf', authenticate, requireStaff(), requireFeature('bookings'), asyncHandler(bookingsController.getServiceVoucherPdf));
+router.get('/:id/travel-pack/pdf', authenticate, requireStaff(), requireFeature('bookings'), asyncHandler(bookingsController.getTravelPackPdf));
 
 // Cancellation
-router.post('/:id/cancel', authenticate, requireAdmin(), requireWriteAccess, requireFeature('bookings'), asyncHandler(bookingsController.post_id_cancel_10));
+router.post('/:id/cancel', authenticate, requireAdmin(), requireWriteAccess, requireFeature('bookings'), asyncHandler(bookingsController.cancelBooking));
 
 export default router;

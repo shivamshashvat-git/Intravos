@@ -56,7 +56,7 @@ class LeadService {
       .eq('tenant_id', tenantId)
       .eq('customer_phone', customer_phone)
       .is('deleted_at', null)
-      .not('status', 'in', '("completed","cancelled")');
+      .not('status', 'in', ['completed', 'cancelled']);
 
     // 3. Lead Insertion
     const { data: lead, error: leadErr } = await supabaseAdmin
@@ -74,6 +74,7 @@ class LeadService {
         location,
         checkin_date,
         checkout_date,
+        travel_start_date: leadData.travel_start_date || checkin_date || null,
         guests: guests || 1,
         rooms: rooms || 1,
         price_seen,
@@ -204,8 +205,8 @@ class LeadService {
     // 3. Track Modifications
     const trackedFields = [
       'status', 'priority', 'assigned_to', 'destination', 'hotel_name',
-      'location', 'checkin_date', 'checkout_date', 'guests', 'rooms',
-      'price_seen', 'vendor_cost', 'margin', 'final_price'
+      'location', 'checkin_date', 'checkout_date', 'travel_start_date', 'guests', 'rooms',
+      'price_seen', 'cost_price', 'margin', 'selling_price'
     ];
 
     const modifications = [];

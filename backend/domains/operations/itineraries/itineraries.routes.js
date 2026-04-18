@@ -10,47 +10,6 @@ import { softDeleteDirect  } from '../../../core/utils/softDelete.js';
 
 const router = express.Router();
 
-async function fetchItineraryWithDays(tenantId, itineraryId) {
-  const { data: itinerary, error } = await supabaseAdmin
-    .from('itineraries')
-    .select('*')
-    .eq('id', itineraryId)
-    .eq('tenant_id', tenantId)
-    .is('deleted_at', null)
-    .maybeSingle();
-
-  if (error) throw error;
-  if (!itinerary) return null;
-
-  const { data: days, error: dayError } = await supabaseAdmin
-    .from('itinerary_days')
-    .select('*')
-    .eq('itinerary_id', itineraryId)
-    .is('deleted_at', null)
-    .order('sort_order');
-
-  if (dayError) throw dayError;
-
-  const hydratedDays = [];
-  for (const day of days || []) {
-    const { data: items, error: itemError } = await supabaseAdmin
-      .from('itinerary_items')
-      .select('*')
-      .eq('day_id', day.id)
-      .is('deleted_at', null)
-      .order('sort_order');
-
-    if (itemError) throw itemError;
-
-    hydratedDays.push({
-      ...day,
-      itinerary_items: items || [] });
-  }
-
-  return {
-    ...itinerary,
-    itinerary_days: hydratedDays };
-}
 
 // ── PUBLIC SHARE (no auth — must be before authenticated routes) ──
 

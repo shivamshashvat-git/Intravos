@@ -12,7 +12,7 @@ class BookingService {
    */
   async getBookingHub(tenantId, bookingId) {
     // Attempt high-performance RPC first
-    const { data: hub, error: rpcErr } = await supabaseAdmin.rpc('get_booking_hub_v1', {
+    const { data: hub, error: rpcErr } = await supabaseAdmin.rpc('get_booking_hub', {
       p_tenant_id: tenantId,
       p_booking_id: bookingId
     });

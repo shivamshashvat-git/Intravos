@@ -11,8 +11,10 @@ import logger from '../utils/logger.js';
 const SENSITIVE_FINANCIAL_KEYS = new Set([
   'cost_price',
   'cost_to_agency',
-  'vendor_cost',
-  'vendor_net',
+  'total_vendor_cost',
+  'total_cost_price',
+  'total_margin',
+  'margin_percentage',
   'net_profit',
   'profit',
   'margin',

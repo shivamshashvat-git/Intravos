@@ -1,0 +1,1 @@
+                         <select className="w-full p-3 bg-slate-50 border border-slate-200 rounded-xl text-xs font-black uppercase" value={formData.assigned_to} onChange={e => setFormData({...formData, assigned_to: e.target.value})}>

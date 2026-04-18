@@ -57,7 +57,12 @@ class PaymentService {
     // 1. Resolve Scope
     let service = null;
     if (serviceId) {
-      const { data } = await supabaseAdmin.from('booking_services').select('*').eq('id', serviceId).single();
+      const { data } = await supabaseAdmin
+        .from('booking_services')
+        .select('*')
+        .eq('id', serviceId)
+        .eq('tenant_id', tenantId)
+        .single();
       service = data;
     }
 
@@ -94,61 +99,111 @@ class PaymentService {
 
   async _validateRefund(tenantId, invoiceId, leadId, amount) {
     if (invoiceId) {
-      const { data } = await supabaseAdmin.from('invoices').select('amount_paid').eq('id', invoiceId).single();
+      const { data } = await supabaseAdmin
+        .from('invoices')
+        .select('amount_paid')
+        .eq('id', invoiceId)
+        .eq('tenant_id', tenantId)
+        .single();
       if (data && amount > toAmount(data.amount_paid)) throw new Error('Refund exceeds invoice paid amount');
     } else if (leadId) {
-      const { data } = await supabaseAdmin.from('leads').select('amount_collected').eq('id', leadId).single();
+      const { data } = await supabaseAdmin
+        .from('leads')
+        .select('amount_collected')
+        .eq('id', leadId)
+        .eq('tenant_id', tenantId)
+        .single();
       if (data && amount > toAmount(data.amount_collected)) throw new Error('Refund exceeds lead collected amount');
     }
   }
 
   async _syncLeadCollected(tenantId, leadId, amount, direction) {
     if (!leadId) return;
-    const { data: lead } = await supabaseAdmin.from('leads').select('amount_collected').eq('id', leadId).single();
+    const { data: lead } = await supabaseAdmin
+      .from('leads')
+      .select('amount_collected')
+      .eq('id', leadId)
+      .eq('tenant_id', tenantId)
+      .single();
     if (!lead) return;
     const delta = direction === 'out' ? -amount : amount;
-    await supabaseAdmin.from('leads').update({ amount_collected: Math.max(0, toAmount(lead.amount_collected) + delta) }).eq('id', leadId);
+    await supabaseAdmin
+      .from('leads')
+      .update({ amount_collected: Math.max(0, toAmount(lead.amount_collected) + delta) })
+      .eq('id', leadId)
+      .eq('tenant_id', tenantId);
   }
 
   async _syncInvoicePaid(tenantId, invoiceId, amount, direction) {
     if (!invoiceId) return;
-    const { data: inv } = await supabaseAdmin.from('invoices').select('id, total, amount_paid, status').eq('id', invoiceId).single();
+    const { data: inv } = await supabaseAdmin
+      .from('invoices')
+      .select('id, total, amount_paid, status')
+      .eq('id', invoiceId)
+      .eq('tenant_id', tenantId)
+      .single();
     if (!inv) return;
     const delta = direction === 'out' ? -amount : amount;
     const newPaid = Math.max(0, toAmount(inv.amount_paid) + delta);
-    await supabaseAdmin.from('invoices').update({ 
-      amount_paid: newPaid,
-      status: this._nextInvoiceStatus(inv, newPaid)
-    }).eq('id', invoiceId);
+    await supabaseAdmin
+      .from('invoices')
+      .update({ 
+        amount_paid: newPaid,
+        status: this._nextInvoiceStatus(inv, newPaid)
+      })
+      .eq('id', invoiceId)
+      .eq('tenant_id', tenantId);
   }
 
   async _syncBankAccount(tenantId, accountId, amount, direction) {
     if (!accountId) return;
-    const { data: acc } = await supabaseAdmin.from('bank_accounts').select('running_balance').eq('id', accountId).single();
+    const { data: acc } = await supabaseAdmin
+      .from('bank_accounts')
+      .select('running_balance')
+      .eq('id', accountId)
+      .eq('tenant_id', tenantId)
+      .single();
     if (!acc) return;
     const delta = direction === 'out' ? -amount : amount;
-    await supabaseAdmin.from('bank_accounts').update({ running_balance: toAmount(acc.running_balance) + delta }).eq('id', accountId);
+    await supabaseAdmin
+      .from('bank_accounts')
+      .update({ running_balance: toAmount(acc.running_balance) + delta })
+      .eq('id', accountId)
+      .eq('tenant_id', tenantId);
   }
 
   async _syncSupplierService(tenantId, service, amount) {
     if (!service) return;
     const newPaid = toAmount(service.paid_to_supplier_amount) + amount;
-    await supabaseAdmin.from('booking_services').update({
-      paid_to_supplier_amount: newPaid,
-      supplier_payment_status: this._nextSupplierStatus(service, newPaid),
-      last_payment_date: new Date().toISOString().split('T')[0]
-    }).eq('id', service.id);
+    await supabaseAdmin
+      .from('booking_services')
+      .update({
+        paid_to_supplier_amount: newPaid,
+        supplier_payment_status: this._nextSupplierStatus(service, newPaid),
+        last_payment_date: new Date().toISOString().split('T')[0]
+      })
+      .eq('id', service.id)
+      .eq('tenant_id', tenantId);
   }
 
   async _syncSupplierDirectory(tenantId, vendorId, amount, service) {
-    const { data: v } = await supabaseAdmin.from('agents_directory').select('*').eq('id', vendorId).single();
+    const { data: v } = await supabaseAdmin
+      .from('agents_directory')
+      .select('*')
+      .eq('id', vendorId)
+      .eq('tenant_id', tenantId)
+      .single();
     if (!v) return;
     
-    await supabaseAdmin.from('agents_directory').update({
-      outstanding_payables: Math.max(0, toAmount(v.outstanding_payables) - amount),
-      total_business_value: toAmount(v.total_business_value) + amount,
-      commission_earned: toAmount(v.commission_earned) + (service ? toAmount(service.commission_amount) : 0)
-    }).eq('id', vendorId);
+    await supabaseAdmin
+      .from('agents_directory')
+      .update({
+        outstanding_payables: Math.max(0, toAmount(v.outstanding_payables) - amount),
+        total_business_value: toAmount(v.total_business_value) + amount,
+        commission_earned: toAmount(v.commission_earned) + (service ? toAmount(service.commission_amount) : 0)
+      })
+      .eq('id', vendorId)
+      .eq('tenant_id', tenantId);
   }
 
   /**

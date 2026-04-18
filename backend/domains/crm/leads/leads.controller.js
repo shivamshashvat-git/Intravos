@@ -8,7 +8,10 @@ import { supabaseAdmin } from '../../../providers/database/supabase.js';
  */
 class LeadsController {
   
-  async post_public_0(req, res, next) {
+  /**
+   * Public lead capture (website forms)
+   */
+  async createPublicLead(req, res, next) {
     try {
       const { lead, duplicates } = await leadService.createLead(
         req.tenant.id, 
@@ -22,7 +25,10 @@ class LeadsController {
     }
   }
 
-  async get__1(req, res, next) {
+  /**
+   * List leads with filters
+   */
+  async listLeads(req, res, next) {
     try {
       const result = await leadService.getAllLeads(req.user.tenantId, req.query);
       return response.success(res, result);
@@ -31,7 +37,10 @@ class LeadsController {
     }
   }
 
-  async get_id_2(req, res, next) {
+  /**
+   * Fetch single lead details
+   */
+  async getLeadById(req, res, next) {
     try {
       const lead = await leadService.getLeadById(req.user.tenantId, req.params.id);
       if (!lead) return response.error(res, 'Lead not found', 404);
@@ -41,7 +50,10 @@ class LeadsController {
     }
   }
 
-  async post__4(req, res, next) {
+  /**
+   * Create lead manually
+   */
+  async createLead(req, res, next) {
     try {
       const { lead, duplicates } = await leadService.createLead(
         req.user.tenantId,
@@ -59,7 +71,10 @@ class LeadsController {
     }
   }
 
-  async patch_id_5(req, res, next) {
+  /**
+   * Update lead details
+   */
+  async updateLead(req, res, next) {
     try {
       const lead = await leadService.updateLead(req.user.tenantId, req.user.id, req.params.id, req.body);
       return response.success(res, { lead });
@@ -68,7 +83,10 @@ class LeadsController {
     }
   }
 
-  async delete_id_6(req, res, next) {
+  /**
+   * Soft-delete/Archive lead
+   */
+  async deleteLead(req, res, next) {
     try {
       const result = await leadService.deleteLead(req.user.tenantId, req.user.id, req.params.id);
       if (!result) return response.error(res, 'Lead not found or already deleted', 404);
@@ -78,7 +96,10 @@ class LeadsController {
     }
   }
 
-  async get_id_booking_confirmation_pdf_3(req, res, next) {
+  /**
+   * Generate Booking Confirmation PDF
+   */
+  async getLeadBookingPdf(req, res, next) {
     try {
       const lead = await leadService.getLeadById(req.user.tenantId, req.params.id);
       if (!lead) return response.error(res, 'Lead not found', 404);
@@ -94,7 +115,142 @@ class LeadsController {
     }
   }
 
-  async post_id_assign_15(req, res, next) {
+  /**
+   * Fetch lead modification history
+   */
+  async getLeadModifications(req, res, next) {
+    try {
+      const { data, error } = await supabaseAdmin
+        .from('activity_logs')
+        .select('*')
+        .eq('entity_type', 'lead')
+        .eq('entity_id', req.params.id)
+        .eq('tenant_id', req.user.tenantId)
+        .order('created_at', { ascending: false });
+      
+      if (error) throw error;
+      return response.success(res, data);
+    } catch (error) {
+      next(error);
+    }
+  }
+
+  /**
+   * Add a note to a lead
+   */
+  async addLeadNote(req, res, next) {
+    try {
+      const { content } = req.body;
+      const { data, error } = await supabaseAdmin
+        .from('lead_notes')
+        .insert({
+          tenant_id: req.user.tenantId,
+          lead_id: req.params.id,
+          user_id: req.user.id,
+          content
+        })
+        .select()
+        .single();
+      
+      if (error) throw error;
+      return response.success(res, data, 'Note added');
+    } catch (error) {
+      next(error);
+    }
+  }
+
+  /**
+   * Record a communication event
+   */
+  async recordLeadCommunication(req, res, next) {
+    try {
+      const { data, error } = await supabaseAdmin
+        .from('engagement_log')
+        .insert({
+          ...req.body,
+          tenant_id: req.user.tenantId,
+          user_id: req.user.id,
+          entity_type: 'lead',
+          entity_id: req.params.id
+        })
+        .select()
+        .single();
+      
+      if (error) throw error;
+      return response.success(res, data, 'Communication recorded');
+    } catch (error) {
+      next(error);
+    }
+  }
+
+  /**
+   * Get WhatsApp/Email share URLs
+   */
+  async getLeadShareUrls(req, res, next) {
+    return response.error(res, 'Method not implemented in industrialized controller yet', 501);
+  }
+
+  /**
+   * Get attachments for a lead
+   */
+  async getLeadAttachments(req, res, next) {
+    try {
+      const { data, error } = await supabaseAdmin
+        .from('lead_attachments')
+        .select('*')
+        .eq('lead_id', req.params.id)
+        .is('deleted_at', null);
+      
+      if (error) throw error;
+      return response.success(res, data);
+    } catch (error) {
+      next(error);
+    }
+  }
+
+  /**
+   * Get lead documents
+   */
+  async getLeadDocuments(req, res, next) {
+    try {
+      const { data, error } = await supabaseAdmin
+        .from('lead_documents')
+        .select('*')
+        .eq('lead_id', req.params.id)
+        .is('deleted_at', null);
+      
+      if (error) throw error;
+      return response.success(res, data);
+    } catch (error) {
+      next(error);
+    }
+  }
+
+  /**
+   * Upload a document for a lead
+   */
+  async uploadLeadDocument(req, res, next) {
+    return response.error(res, 'Document upload requires industrialized storage provider integration', 501);
+  }
+
+  /**
+   * Update lead document metadata
+   */
+  async updateLeadDocument(req, res, next) {
+    return response.error(res, 'Method not implemented', 501);
+  }
+
+  /**
+   * Delete lead attachment
+   */
+  async deleteLeadAttachment(req, res, next) {
+    return response.error(res, 'Method not implemented', 501);
+  }
+
+  /**
+   * Reassign lead to another staff member
+   */
+  async assignLead(req, res, next) {
     try {
       const { assigned_to, silent } = req.body;
       const lead = await leadService.updateLead(req.user.tenantId, req.user.id, req.params.id, { assigned_to, silent });
@@ -104,7 +260,10 @@ class LeadsController {
     }
   }
 
-  async post_bulk_assign_16(req, res, next) {
+  /**
+   * Mass reassignment of leads
+   */
+  async bulkAssignLeads(req, res, next) {
     try {
       const { lead_ids, assigned_to } = req.body;
       const results = { updated: 0, failed: 0 };
@@ -120,7 +279,10 @@ class LeadsController {
     }
   }
 
-  async post_bulk_status_17(req, res, next) {
+  /**
+   * Mass status update of leads
+   */
+  async bulkUpdateLeadStatus(req, res, next) {
     try {
       const { lead_ids, status } = req.body;
       const updatedLeads = await leadService.bulkUpdateStatus(req.user.tenantId, lead_ids, status);

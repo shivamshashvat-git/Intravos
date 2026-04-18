@@ -124,6 +124,81 @@ class ItinerariesController {
       next(error);
     }
   }
+
+  async post_share__token_view(req, res, next) {
+    // 501: Itinerary View Analytics not yet implemented
+    return response.error(res, 'Itinerary view tracking is pending implementation', 501);
+  }
+
+  async get_marketplace(req, res, next) {
+    // 501: Marketplace discovery not yet ported to industrialized controller
+    return response.error(res, 'Global Itinerary Marketplace is currently being optimized. Check back soon.', 501);
+  }
+
+  async get_hotels_photo(req, res, next) {
+    // 501: Google Places photo hydration pending
+    return response.error(res, 'Hotel photo resolution is currently unavailable', 501);
+  }
+
+  async post_id_publish_15(req, res, next) {
+    try {
+      const result = await itineraryService.updateItinerary(req.user.tenantId, req.params.id, { is_published: true });
+      return response.success(res, { itinerary: result }, 'Itinerary published to client portal');
+    } catch (error) { next(error); }
+  }
+
+  // ── DAY MUTATIONS ──
+
+  async post_id_days_8(req, res, next) {
+    try {
+      const data = await itineraryService.addDay(req.user.tenantId, req.params.id, req.body);
+      return response.success(res, { day: data }, 'Day added to itinerary', 201);
+    } catch (error) { next(error); }
+  }
+
+  async patch_id_days__dayId_9(req, res, next) {
+    try {
+      const data = await itineraryService.updateDay(req.user.tenantId, req.params.dayId, req.body);
+      return response.success(res, { day: data }, 'Day metadata updated');
+    } catch (error) { next(error); }
+  }
+
+  async delete_id_days__dayId_10(req, res, next) {
+    try {
+      await itineraryService.deleteDay(req.user.tenantId, req.params.dayId);
+      return response.success(res, { success: true }, 'Day removed from itinerary');
+    } catch (error) { next(error); }
+  }
+
+  // ── ITEM MUTATIONS ──
+
+  async post_id_days__dayId_items_11(req, res, next) {
+    try {
+      const data = await itineraryService.addItem(req.user.tenantId, req.params.dayId, req.body);
+      return response.success(res, { item: data }, 'Item added to day', 201);
+    } catch (error) { next(error); }
+  }
+
+  async patch_id_days__dayId_items__itemId_12(req, res, next) {
+    try {
+      const data = await itineraryService.updateItem(req.user.tenantId, req.params.itemId, req.body);
+      return response.success(res, { item: data }, 'Item metadata updated');
+    } catch (error) { next(error); }
+  }
+
+  async delete_id_days__dayId_items__itemId_13(req, res, next) {
+    try {
+      await itineraryService.deleteItem(req.user.tenantId, req.params.itemId);
+      return response.success(res, { success: true }, 'Item removed from day');
+    } catch (error) { next(error); }
+  }
+
+  async put_id_days_reorder_14(req, res, next) {
+    try {
+      await itineraryService.reorderDays(req.user.tenantId, req.params.id, req.body.day_ids);
+      return response.success(res, { success: true }, 'Day sequence synchronized');
+    } catch (error) { next(error); }
+  }
 }
 
 export default new ItinerariesController();
