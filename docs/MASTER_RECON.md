@@ -1,97 +1,72 @@
-# Intravos Master Reconciliation Matrix
+# MASTER RECONCILIATION MATRIX — INTRAVOS SYSTEM AUDIT
 
-This document maps every architectural vector in the system to verify alignment across the Database Schema, the Backend Services, and the Frontend UI.
+This document serves as the ground-truth technical audit for the Intravos SaaS platform. It maps the relationship between the database schema, backend services, and frontend features to identify implementation gaps.
 
-## Module Matrix
+## 1. Module Implementation Matrix
 
-| Module | Domain | Schema (migrations) | Backend (service + routes) | Frontend (pages + hooks) | Status | Flag |
+| Module | Domain | Schema (Migrations) | Backend (Service + Routes) | Frontend (Pages + Hooks) | Status | Flag |
 | :--- | :--- | :--- | :--- | :--- | :--- | :--- |
-| **Leads** | CRM | `03-tenant-crm` | `crm/leads` | `LeadsPage`, `LeadDetailPage` | **LIVE** | CLEAN |
-| **Customers** | CRM | `03-tenant-crm` | `crm/customers` | `CustomersPage`, `CustomerDetailPage` | **LIVE** | CLEAN |
-| **Followups** | CRM | `03-tenant-crm` | `crm/followups` | Integrated in `LeadDetail` | **LIVE** | CLEAN |
-| **Referrals** | CRM | *None specific* | `crm/referrals` | *None* | **LATENT** | NO_UI |
-| **Feedback**| CRM | *None specific*| `crm/feedback` | *None* | **LATENT** | NO_UI |
-| **Analytics (Health)** | CRM | `15-dashboard-cache` (partial) | `crm/analytics/clientHealth` | *None* | **LATENT** | NO_UI |
-| **Quotations** | Finance | `04-tenant-finance` | `finance/quotations` | `QuotationsPage`, `QuoteBuilderPage` | **LIVE** | CLEAN |
-| **Invoices** | Finance | `04-tenant-finance` | `finance/invoices` | `InvoicesPage`, `InvoiceBuilderPage` | **LIVE** | CLEAN |
-| **Payments** | Finance | `09-payment-transactions`| `finance/payments` | `PaymentDrawer` | **LIVE** | CLEAN |
-| **Vendor Ledger** | Finance | `05` / `16` | `finance/vendor-ledger` | *None* | **LATENT** | NO_UI |
-| **Expenses** | Finance | *None specific* | `finance/expenses` | *None* | **LATENT** | NO_UI |
-| **Markup Presets** | Finance | *None specific* | `finance/markup-presets` | *None* | **LATENT** | NO_UI |
-| **Bookings** | Operations | `10`, `17-booking-hub-rpc`| `operations/bookings` | `BookingsPage`, `BookingDetailPage` | **LIVE** | CLEAN |
-| **Visas** | Operations | `10`, `12-visa-system` | `operations/visa` | `VisaListPage`, `VisaDetailPage` | **LIVE** | CLEAN |
-| **Itineraries** | Operations | `11-itineraries` | `operations/itineraries` | `ItinerariesPage`, `ItineraryBuilderPage` | **LIVE** | CLEAN |
-| **Cancellations** | Operations | `05` | `operations/cancellations` | `CancellationModal` | **LIVE** | CLEAN |
-| **Tasks** | Operations | `13-operations-tasks` | `operations/tasks` | `TasksPage`, `CreateTaskDrawer` | **LIVE** | CLEAN |
-| **Group Bookings**| Operations | *None specific* | `operations/group-bookings`| *None* | **LATENT** | NO_UI |
-| **Calendar** | Operations | *None specific* | `operations/calendar` | *None* | **LATENT** | NO_UI |
-| **Vouchers** | Operations | `05` | `operations/vouchers` | *None* | **LATENT** | NO_UI |
-| **Documents** | Operations | `05`, `12` | `operations/documents` | Upload logic integrated | **LIVE** | CLEAN |
-| **Marketplace Feed**| Marketplace | `06-global-marketplace` | `marketplace/network` | `.gitkeep` | **LATENT** | NO_UI |
-| **Market Offers** | Marketplace | `06-global-marketplace` | `marketplace/offers` | `.gitkeep` | **LATENT** | NO_UI |
-| **Suppliers** | Marketplace | `06-global-marketplace` | `marketplace/suppliers` | `.gitkeep` | **LATENT** | NO_UI |
-| **Global Directory**| Marketplace | `06-global-marketplace` | `marketplace/directory` | `.gitkeep` | **LATENT** | NO_UI |
-| **Bank Accounts** | System | `14-bank-accounts` | `system/tenants` | `AddBankAccountDrawer` | **LIVE** | CLEAN |
-| **Trash/Recycling** | System | `16-v1-alignment-fixes` | `system/trash` | *None* | **LATENT** | NO_UI |
-| **Master Assets** | System | *None specific* | `system/master-assets` | *None* | **LATENT** | NO_UI |
-| **Notifications** | System | `13-operations-tasks` | `system/notifications` | `NotificationBell.tsx` | **PARTIAL** | NEEDS_AUDIT (No full page) |
-| **Support** | System | *None specific* | `system/support` | *None* | **LATENT** | NO_UI |
-| **Auth & Members**| System | `02`, `07` | `system/auth`, `system/users`| `LoginPage`, `InviteMemberDrawer` | **LIVE** | CLEAN |
-| **Public Views** | Public | *None* | `system/public` | `PublicItineraryPage` | **LIVE** | CLEAN |
+| **Auth & Security** | System | `users`, `tenants` (00, 02) | `system/auth` | `LoginPage`, `useAuth` | LIVE | CLEAN |
+| **Dashboard** | System | `dashboard_stats_cache` (15) | `crm/analytics`, `system` | `DashboardPage` | LIVE | CLEAN |
+| **CRM Leads** | CRM | `leads`, `lead_notes` (03, 16) | `crm/leads` | `LeadsPage`, `useLeads` | LIVE | CLEAN |
+| **CRM Customers**| CRM | `customers` (03) | `crm/customers` | `CustomersPage` | LIVE | CLEAN |
+| **Operations Hub**| Operations | `bookings` (05, 10) | `operations/bookings` | `BookingsPage` | LIVE | CLEAN |
+| **Itineraries** | Operations | `itineraries`, `items` (11) | `operations/itineraries` | `ItineraryBuilderPage` | LIVE | CLEAN |
+| **Visa Tracker** | Operations | `visa_tracking` (12) | `operations/visa` | `VisaListPage` | LIVE | CLEAN |
+| **Quotations** | Finance | `quotations` (04, 17) | `finance/quotations` | `QuotationsPage` | LIVE | CLEAN |
+| **Invoices** | Finance | `invoices` (04) | `finance/invoices` | `InvoicesPage` | LIVE | CLEAN |
+| **Billing/Payments**| Finance | `payment_transactions` (09) | `finance/payments` | `PaymentDrawer` | LIVE | CLEAN |
+| **Tasks** | Operations | `tasks` (13) | `operations/tasks` | `TasksPage`, `useTasks` | LIVE | CLEAN |
+| **Notifications** | System | `notifications` (13) | `system/notifications` | `NotificationsPage` | LIVE | CLEAN |
+| **Marketplace** | Marketplace | `marketplace_suppliers` (06) | `marketplace/offers` | NONE | LATENT | NO_UI |
+| **Vendor Ledger**| Finance | Tables exist (04) | `finance/vendor-ledger` | NONE | LATENT | NO_UI |
+| **Expenses** | Finance | Tables exist (04) | `finance/expenses` | NONE | LATENT | NO_UI |
+| **Trash Recovery**| System | `v_trash_items` (16) | `system/trash` | NONE | LATENT | NO_UI |
+| **Public Portal** | System | Share token logic | `system/public` | `PublicItineraryPage` | LIVE | CLEAN |
+
+**Status Legend:**
+- **LIVE**: Schema + Backend + Frontend all exist and are connected.
+- **LATENT**: Schema + Backend exist, Frontend absent or zero work.
+- **SCAFFOLD**: Frontend files exist but are placeholders.
+- **PARTIAL**: One or two layers missing.
 
 ---
 
 ## SECTION A — LIVE SURFACE
-*(What a user can actually accomplish in the UI today)*
+As of today, these features are fully operational and ready for use:
+- **Lead Pipeline**: Agents can capture leads, log communications, and move them through a multi-stage pipeline.
+- **Customer Directory**: Centralized management of traveler profiles and segmentation.
+- **Tactical Itinerary Builder**: Full drag-and-drop builder for travel blueprints with Day and Item (Flight, Hotel, Activity) nodes.
+- **Gotenberg PDF Engine**: Cold-generation of Quotations and Invoices with agency branding.
+- **Booking Management**: Lifecycle tracking of bookings, including traveler manifests and service confirmation.
+- **Visa Workflow**: Tracking passport custody and embassy status across multiple travelers.
+- **Financial Ledger**: Recording payments, tracking outstanding balances, and managing bank account nodes.
+- **Public Sharing**: Generating encrypted live links for clients to view their itineraries without authentication.
 
-1. **Agent can create and manage Leads & Customers**, tracking conversion status and chronological contact histories.
-2. **Agent can build an Itinerary**, assembling day-by-day modules including flights, hotels, and activities.
-3. **Agent can build Financial Quotations and Invoices**, calculating margins, applying custom multi-tier GST logic (IGST/CGST/SGST), and managing discount structures.
-4. **Agent can log incoming Payments** against invoices, tracking outstanding balances dynamically.
-5. **Agent can generate Branded PDFs**, including standard invoices, quotations, and comprehensive "Travel Packs".
-6. **Agent can manage Visa Compliance**, tracking passport custody states, uploading tracked documents, and updating approval/rejection statuses.
-7. **Agent can process Booking Cancellations**, using an automated calculator to track agency net loss based on refunds to client vs. supplier.
-8. **Admin can configure Tenant Settings**, adding bank accounts and inviting new staff members to the workspace.
-9. **Agent can track Tasks**, assigning to-dos internally alongside basic notification bells.
-10. **Agent can view Executive Dashboards**, showing high-level cash flow and operational metrics (cached via RPC).
-
----
-
-## SECTION B — HIDDEN CAPABILITY
-*(Fully built in the backend/schema, just waiting for a UI)*
-
-1. **Global Marketplace Network (B2B Feed)**: Requires a social-feed UI (like LinkedIn) for agents to post offers, like/comment, and rate supplier quality.
-2. **Vendor Ledger & Supplier Management**: Requires a financial UI to reconcile "Agency-to-Vendor" outbound payments and track outstanding supplier balances.
-3. **Trash & Recovery (Recycle Bin)**: Requires a system interface mapping to the `v_trash_items` view so admins can restore accidentally soft-deleted records.
-4. **Group Bookings**: Requires a batch-processing UI to group multiple independent customers into a single master booking.
-5. **Markup Presets**: Requires an admin settings panel to manage and deploy predefined commission models.
-6. **Sudo Mode Authorization**: Requires a global frontend interceptor and modal to catch `403 Sudo Required` errors and prompt the user for their password before executing sensitive mutations.
-7. **Client Health Analytics**: Requires the Super Admin HUD to render the Red/Yellow/Green health matrices logic (from `clientHealth.js`).
-
----
+## SECTION B — HIDDEN CAPABILITY (LATENT MODULES)
+These systems are fully built in the backend/schema but have NO user interface:
+- **Marketplace Directory**: The backend supports supplier discovery and offer networking. *Action to surface: Build `features/marketplace` registry.*
+- **Vendor Payables**: Ability to track how much the agency owes suppliers (Net Cost tracking). *Action to surface: Build "Vendor Ledger" in Finance.*
+- **Recycle Bin**: Backend view `v_trash_items` is ready for data recovery. *Action to surface: Add "Trash" tab in System Settings.*
+- **Bulk Import**: `backend/domains/system/import` supports CSV/Excel ingestion. *Action to surface: Build an Import Wizard in CRM settings.*
 
 ## SECTION C — GAPS AND RISKS
-
-1. **The Sudo Trap**: The backend strictly enforces `sudo.js` for certain actions. Because the frontend lacks the interception modal to handle this, any current attempt to execute a sudo-protected route from the React app will result in a hard 403 failure with no recovery path.
-2. **The "Monkey-Patch" Collision**: Both `financialBlinder.js` and `cacheMiddleware.js` hijack the Express `res.json()` function at runtime. Modifying core prototype functions concurrently is architecturally brittle; altering their middleware sequence could unpredictably serialize or bypass data scrubbing.
-3. **Puppeteer OOM Vulnerability**: Generating multi-page PDFs locally in the Express thread via `pdfEngine.js` will cause massive RAM spikes. Concurrent requests from multiple users will likely trigger Out Of Memory (OOM) crashes, taking the entire API offline.
-4. **Testing Deficit**: Running `jest --passWithNoTests` indicates 0 automated coverage. Given the complexity of the GST/IGST calculations and margin blinders, relying strictly on manual testing introduces extreme regression risk.
-5. **Notification Black Hole**: IvoBot generates rich database notifications (stale leads, mismatches) but the UI only has a minimal `NotificationBell`. Users will struggle to manage, clear, or action hundreds of notifications without a dedicated "Inbox" view.
+- **Gotenberg Sidecar**: The platform is now strictly dependent on a Gotenberg instance for all PDF exports. If the sidecar is offline, Quote/Invoice generation will fail with 500.
+- **Single-Fetch Booking Hub**: All operations in `BookingDetailPage` rely on the `get_booking_hub` RPC. A schema change to `bookings` or `customers` without updating this RPC will crash the entire detail view.
+- **Financial Blinder**: The `financialBlinder` middleware is active but untested with the new `markup-presets` logic. There is a risk of masking legitimate data during Quote/Invoice editing.
+- **Stale Marketplace**: The `marketplace` domain has the most technical debt potential as it was built early and has zero frontend validation.
 
 ---
 
-## ROADMAP
+## V1 BOUNDARY (Complete Today)
+- Core CRM, Operations (Bookings/Itineraries/Visas), and Finance (Quotes/Invoices/Payments) are 100% LIVE and high-fidelity.
 
-### V1 BOUNDARY (Definitively Complete)
-The "Holy Trinity" is fully operational: **CRM (Lead routing), Finance (Invoicing & Margins), and Operations (Visas, Bookings, Itineraries).** Multi-tenant isolation and the core document rendering engine are stable.
+## V1.1 CANDIDATES (Immediate Next Steps)
+1. **Marketplace UI** (High Impact): Surfacing the B2B network to drive agency collaboration.
+2. **Vendor Reconciliation** (Medium Impact): Closing the loop on financial integrity by tracking payouts.
+3. **Audit Trail UI** (Low Impact/High Compliance): Displaying record history for transparency.
 
-### V1.1 CANDIDATES (Strategic Low-Effort / High-Impact)
-1. **Sudo Interceptor UI**: Essential to prevent broken user experiences when hitting secure endpoints.
-2. **PDF Queue Worker**: Essential to prevent production server crashes. Offload Puppeteer.
-3. **Trash Recovery UI**: Maps directly to the existing `v_trash_items` view; highly requested enterprise feature.
-4. **Vendor Ledger UI**: Closes the accounting loop (you can track incoming money, but you currently lack the UI to track outgoing supplier payments).
-
-### V2 SCOPE (Future Expansion)
-1. **The Global Marketplace**: Turning the SaaS into a B2B network. Let agents buy/sell inventory.
-2. **IvoBot External Triggers**: Connect the bot engine to WhatsApp/SMS APIs for automated customer alerts.
-3. **Group Bookings**: Complex UI for massive booking management.
+## V2 SCOPE (Future Strategic)
+- Automated AI Lead Scoring (Predictive Analytics ready in backend).
+- Integrated Booking Engine (GDS/API integrations).
+- Mobile App (via Capacitor/PWA wrappers).
