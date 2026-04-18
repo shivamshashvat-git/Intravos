@@ -24,6 +24,9 @@ export default {
   cron: {
     secret: process.env.CRON_SECRET || 'dev-cron-secret-change-me',
   },
+  gotenberg: {
+    url: process.env.GOTENBERG_URL || null,
+  },
   storage: {
     defaultBucket: process.env.STORAGE_BUCKET || process.env.STORAGE_BUCKET_UPLOADS || 'iv-uploads',
     buckets: {

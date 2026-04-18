@@ -16,7 +16,21 @@ services:
         sync: false # Optional
       - key: REDIS_URL
         sync: false # For rate limiting, optional
+      - key: GOTENBERG_URL
+        fromService:
+          type: web
+          name: intravos-pdf
+          property: host
       - key: NODE_ENV
         value: production
+      - key: PORT
+        value: 3000
+
+  - type: web
+    name: intravos-pdf
+    runtime: docker
+    dockerfilePath: ../gotenberg/Dockerfile
+    plan: starter
+    envVars:
       - key: PORT
         value: 3000
