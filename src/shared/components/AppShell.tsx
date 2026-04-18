@@ -24,6 +24,7 @@ import { NotificationDropdown } from '@/shared/components/NotificationBell';
 import { supabase } from '@/core/lib/supabase';
 import { clsx } from 'clsx';
 import { twMerge } from 'tailwind-merge';
+import { SudoModal } from '@/shared/components/SudoModal';
 
 function cn(...inputs: any[]) {
   return twMerge(clsx(inputs));
@@ -247,6 +248,7 @@ export const AppShell: React.FC = () => {
           })}
         </nav>
       </main>
+      <SudoModal />
     </div>
   );
 };
