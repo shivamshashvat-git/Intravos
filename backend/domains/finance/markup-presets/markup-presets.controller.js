@@ -9,7 +9,7 @@ class MarkupPresetsController {
   /**
    * List Managed Pricing Rules
    */
-  async get__0(req, res, next) {
+  async listPresets(req, res, next) {
     try {
       const data = await markupService.listPresets(req.user.tenantId);
       return response.success(res, { presets: data });
@@ -21,7 +21,7 @@ class MarkupPresetsController {
   /**
    * Register New Pricing Logic
    */
-  async post__1(req, res, next) {
+  async createPreset(req, res, next) {
     try {
       const preset = await markupService.createPreset(req.user.tenantId, req.body);
       return response.success(res, { preset }, 'Markup preset created', 201);
@@ -34,7 +34,7 @@ class MarkupPresetsController {
   /**
    * Modify Internal Pricing Attributes
    */
-  async patch_id_2(req, res, next) {
+  async updatePreset(req, res, next) {
     try {
       const preset = await markupService.updatePreset(req.user.tenantId, req.params.id, req.body);
       return response.success(res, { preset }, 'Markup preset updated');
@@ -46,7 +46,7 @@ class MarkupPresetsController {
   /**
    * Retire Pricing Logic Entry
    */
-  async delete_id_3(req, res, next) {
+  async deletePreset(req, res, next) {
     try {
       const result = await markupService.deletePreset(req.user.tenantId, req.user.id, req.params.id);
       if (!result) return response.error(res, 'Markup preset not found', 404);

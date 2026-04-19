@@ -13,19 +13,26 @@ const MASTER_SUPER_ADMIN_ID = "0407a091-a675-4702-861c-8eb591eeb000";
  * Permission Check Helper
  */
 function hasPermission(user, module, action) {
-  // 1. God Mode Override
+  // 1. Platform-Tier God Mode (Platform Manager is Read-Only)
   if (user.role === 'super_admin' || user.id === MASTER_SUPER_ADMIN_ID) return true;
-
-  // 2. Admin Default (Admins have full access within their tenant by default)
-  if (user.role === 'admin') return true;
-
-  // 3. Platform Manager Logic (Read-only System Core)
+  if (user.role === 'ivobot') return true;
+  
   if (user.role === 'platform_manager') {
-    if (['read', 'view'].includes(action)) return true;
-    return false; // mutations blocked in core
+    return ['read', 'view'].includes(action);
   }
 
-  // 4. Granular Permission Grid Check
+  // 2. Agency Admin Power (Full access within tenant)
+  if (['agency_admin', 'admin'].includes(user.role)) return true;
+
+  // 3. Secondary Admin Power (High-level operational access)
+  if (user.role === 'secondary_admin') {
+    // Secondary admins can do almost everything except billing/deactivation
+    const restrictedActions = ['delete_tenant', 'deactivate_agency_admin', 'change_billing'];
+    if (restrictedActions.includes(action)) return false;
+    return true;
+  }
+
+  // 4. Staff Tier (Granular Permission Grid)
   const permissions = user.permissions || {};
   const modulePerms = permissions[module];
 
@@ -74,9 +81,19 @@ function requireRole(...allowedRoles) {
   };
 }
 
-function requireSuperAdmin() { return requireRole('super_admin'); }
-function requireAdmin() { return requireRole('super_admin', 'admin'); }
-function requireStaff() { return requireRole('super_admin', 'admin', 'staff'); }
+function requireSuperAdmin() { return requireRole('super_admin', 'platform_manager', 'ivobot'); }
+
+function requireAdmin() { 
+  return requireRole('super_admin', 'platform_manager', 'agency_admin', 'admin'); 
+}
+
+function requireSecondary() {
+  return requireRole('super_admin', 'agency_admin', 'secondary_admin', 'admin');
+}
+
+function requireStaff() { 
+  return requireRole('super_admin', 'agency_admin', 'secondary_admin', 'staff', 'admin'); 
+}
 
 function requireWriteAccess(req, res, next) {
   if (req.user && req.user.role === 'platform_manager') {
@@ -91,6 +108,7 @@ export {
   requireRole,
   requireSuperAdmin,
   requireAdmin,
+  requireSecondary,
   requireStaff,
   requireWriteAccess
 };

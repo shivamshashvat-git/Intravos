@@ -19,7 +19,7 @@ export const QuoteBuilderPage: React.FC = () => {
   const [searchParams] = useSearchParams();
   const navigate = useNavigate();
   const { user } = useAuth();
-  const isAdmin = user?.role === 'admin' || user?.role === 'super_admin';
+  const isAdmin = ['admin', 'agency_admin', 'super_admin'].includes(user?.role || '');
   const leadId = searchParams.get('lead_id');
 
   const { 

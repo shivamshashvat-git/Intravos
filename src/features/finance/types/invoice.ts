@@ -97,6 +97,7 @@ export interface Invoice {
   deleted_at?: string;
   sent_at?: string;
   paid_at?: string;
+  payment_link_url?: string;
 
   // Joins
   customer?: { id: string; name: string; phone: string; email: string };

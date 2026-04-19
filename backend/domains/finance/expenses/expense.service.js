@@ -60,6 +60,19 @@ class ExpenseService {
   }
 
   /**
+   * Delete Category
+   */
+  async deleteCategory(tenantId, userId, categoryId) {
+    return await softDeleteDirect({
+      table: 'expense_categories',
+      id: categoryId,
+      tenantId,
+      user: { id: userId },
+      moduleLabel: 'Expense Category'
+    });
+  }
+
+  /**
    * List Expenses with Pagination & Multi-dimensional filters
    */
   async listExpenses(tenantId, filters) {

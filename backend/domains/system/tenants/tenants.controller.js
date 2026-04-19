@@ -1,54 +1,92 @@
-import tenantService from './tenant.service.js';
+import tenantsService from './tenants.service.js';
 import response from '../../../core/utils/responseHandler.js';
+import { tenantUpdateSchema, platformSettingsSchema, bankAccountSchema } from './tenants.schema.js';
 
-/**
- * TenantsController — Industrialized Agency Administration
- */
 class TenantsController {
-  
-  async get_me(req, res, next) {
+  async getTenantProfile(req, res, next) {
     try {
-      const data = await tenantService.getTenant(req.user.tenantId);
-      return response.success(res, { tenant: data });
-    } catch (error) {
-      next(error);
-    }
-  }
-
-  async patch_me(req, res, next) {
-    try {
-      const data = await tenantService.updateTenant(req.user.tenantId, req.body);
-      return response.success(res, { tenant: data }, 'Agency configuration synchronized');
-    } catch (error) {
-      if (error.message.includes('not found')) return response.error(res, error.message, 404);
-      next(error);
-    }
-  }
-
-  async post_coupons_validate(req, res, next) {
-    try {
-      const data = await tenantService.validateCoupon(req.body.coupon_code);
-      return response.success(res, { coupon: data }, 'Coupon criteria met');
-    } catch (error) {
-      if (error.message.includes('required')) return response.error(res, error.message, 400);
-      if (error.message.includes('Invalid') || error.message.includes('expired')) return response.error(res, error.message, 400);
-      next(error);
-    }
-  }
-
-  async get_changelog(req, res, next) {
-    try {
-      const data = await tenantService.getChangelog(req.query.limit);
-      return response.success(res, { changelog: data });
-    } catch (error) {
-      next(error);
-    }
-  }
-
-  async get_stats(req, res, next) {
-    try {
-      const data = await tenantService.getDashboardStats(req.user.tenantId);
+      const data = await tenantsService.getTenantProfile(req.user.tenantId);
       return response.success(res, data);
+    } catch (error) {
+      next(error);
+    }
+  }
+
+  async updateTenantProfile(req, res, next) {
+    try {
+      const validated = tenantUpdateSchema.parse(req.body);
+      const data = await tenantsService.updateTenantProfile(req.user.tenantId, validated, req.user.id);
+      return response.success(res, data, 'Agency profile updated');
+    } catch (error) {
+      if (error.name === 'ZodError') return response.error(res, error.errors[0]?.message, 400);
+      next(error);
+    }
+  }
+
+  async getPlatformSettings(req, res, next) {
+    try {
+      const data = await tenantsService.getPlatformSettings(req.user.tenantId);
+      return response.success(res, data);
+    } catch (error) {
+      next(error);
+    }
+  }
+
+  async updatePlatformSettings(req, res, next) {
+    try {
+      const validated = platformSettingsSchema.parse(req.body);
+      const data = await tenantsService.updatePlatformSettings(req.user.tenantId, validated, req.user.id);
+      return response.success(res, data, 'Platform settings updated');
+    } catch (error) {
+      if (error.name === 'ZodError') return response.error(res, error.errors[0]?.message, 400);
+      next(error);
+    }
+  }
+
+  async listBankAccounts(req, res, next) {
+    try {
+      const data = await tenantsService.listBankAccounts(req.user.tenantId);
+      return response.success(res, data);
+    } catch (error) {
+      next(error);
+    }
+  }
+
+  async addBankAccount(req, res, next) {
+    try {
+      const validated = bankAccountSchema.parse(req.body);
+      const data = await tenantsService.addBankAccount(req.user.tenantId, validated, req.user.id);
+      return response.success(res, data, 'Bank account added', 201);
+    } catch (error) {
+      if (error.name === 'ZodError') return response.error(res, error.errors[0]?.message, 400);
+      next(error);
+    }
+  }
+
+  async updateBankAccount(req, res, next) {
+    try {
+      const validated = bankAccountSchema.partial().parse(req.body);
+      const data = await tenantsService.updateBankAccount(req.user.tenantId, req.params.id, validated, req.user.id);
+      return response.success(res, data, 'Bank account updated');
+    } catch (error) {
+      if (error.name === 'ZodError') return response.error(res, error.errors[0]?.message, 400);
+      next(error);
+    }
+  }
+
+  async deleteBankAccount(req, res, next) {
+    try {
+      await tenantsService.deleteBankAccount(req.user.tenantId, req.params.id, req.user.id);
+      return response.success(res, null, 'Bank account removed');
+    } catch (error) {
+      next(error);
+    }
+  }
+
+  async setPrimaryBankAccount(req, res, next) {
+    try {
+      await tenantsService.setPrimaryBankAccount(req.user.tenantId, req.params.id, req.user.id);
+      return response.success(res, null, 'Primary bank account set');
     } catch (error) {
       next(error);
     }

@@ -1,31 +1,19 @@
-import { supabase } from '@/core/lib/supabase';
+import { apiClient } from '@/core/lib/apiClient';
 import { itinerariesService } from './itinerariesService';
 import { CreateTemplateInput, ItineraryTemplate, DetailedTemplate } from '../types/knowledgeBank';
 
 export const knowledgeBankService = {
   async getTemplates(tenantId: string, filters?: any) {
-    let query = supabase
-      .from('itineraries')
-      .select('*')
-      .eq('tenant_id', tenantId)
-      .eq('is_template', true)
-      .is('deleted_at', null);
+    const params = new URLSearchParams();
+    params.append('is_template', 'true');
+    if (filters?.category && filters.category !== 'all') params.append('category', filters.category);
+    if (filters?.destination) params.append('destination', filters.destination);
+    if (filters?.search) params.append('search', filters.search);
 
-    if (filters) {
-      if (filters.category && filters.category !== 'all') {
-        query = query.eq('category', filters.category);
-      }
-      if (filters.destination) {
-        query = query.ilike('destination', `%${filters.destination}%`);
-      }
-      if (filters.search) {
-        query = query.or(`title.ilike.%${filters.search}%,destination.ilike.%${filters.search}%`);
-      }
-    }
-
-    const { data, error } = await query.order('created_at', { ascending: false });
-    if (error) throw error;
-    return data as ItineraryTemplate[];
+    const res = await apiClient(`/api/operations/itineraries?${params.toString()}`);
+    if (!res.ok) throw new Error('Failed to fetch templates');
+    const result = await res.json();
+    return result.data?.itineraries || result.data as ItineraryTemplate[];
   },
 
   async getTemplate(id: string): Promise<DetailedTemplate> {
@@ -34,36 +22,34 @@ export const knowledgeBankService = {
   },
 
   async createTemplate(tenantId: string, data: CreateTemplateInput): Promise<ItineraryTemplate> {
-    const publicSlug = Math.random().toString(36).substring(2, 10);
-    const { data: template, error } = await supabase
-      .from('itineraries')
-      .insert({ 
-        ...data, 
-        tenant_id: tenantId, 
-        is_template: true,
-        public_slug: publicSlug,
-        is_public: !!data.is_public,
-        status: 'ready',
-        total_days: data.duration_days
-      })
-      .select()
-      .single();
-    if (error) throw error;
-    return template as ItineraryTemplate;
+    const payload = {
+      ...data,
+      is_template: true,
+      is_public: !!data.is_public,
+      status: 'ready',
+      total_days: data.duration_days
+    };
+    
+    const res = await apiClient(`/api/operations/itineraries`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload)
+    });
+    if (!res.ok) throw new Error('Failed to create template');
+    const result = await res.json();
+    return result.data?.itinerary || result.data as ItineraryTemplate;
   },
 
   async updateTemplate(id: string, tenantId: string, data: Partial<ItineraryTemplate>): Promise<ItineraryTemplate> {
-    // Ensure we don't accidentally unset is_template
     const payload = { ...data, is_template: true };
-    const { data: template, error } = await supabase
-      .from('itineraries')
-      .update(payload)
-      .eq('id', id)
-      .eq('tenant_id', tenantId)
-      .select()
-      .single();
-    if (error) throw error;
-    return template as ItineraryTemplate;
+    const res = await apiClient(`/api/operations/itineraries/${id}`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload)
+    });
+    if (!res.ok) throw new Error('Failed to update template');
+    const result = await res.json();
+    return result.data?.itinerary || result.data as ItineraryTemplate;
   },
 
   async deleteTemplate(id: string, tenantId: string): Promise<void> {
@@ -71,7 +57,6 @@ export const knowledgeBankService = {
   },
 
   async duplicateTemplate(id: string): Promise<ItineraryTemplate> {
-    // Force is_template: true and remove client links
     return itinerariesService.duplicateItinerary(id, { 
       is_template: true, 
       lead_id: null, 

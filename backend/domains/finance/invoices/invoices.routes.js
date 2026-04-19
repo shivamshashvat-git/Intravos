@@ -3,11 +3,14 @@ import { z } from 'zod';
 import { validate } from '../../../core/middleware/validate.js';
 import express from 'express';
 import { authenticate  } from '../../../core/middleware/auth.js';
-import { requireStaff, requireAdmin, requireWriteAccess } from '../../../core/middleware/rbac.js';
+import { requireStaff, requireAdmin, requireSecondary, requireWriteAccess } from '../../../core/middleware/rbac.js';
 import { requireFeature } from '../../../core/middleware/featureFlag.js';
-import { asyncHandler  } from '../../../core/middleware/errorHandler.js';
+import { asyncHandler } from '../../../core/middleware/errorHandler.js';
+import { financialBlinder } from '../../../core/middleware/financialBlinder.js';
 
 const router = express.Router();
+
+router.use(financialBlinder);
 
 // ── ZOD SCHEMAS ──
 const invoiceItemSchema = z.object({
@@ -39,24 +42,21 @@ const creditNoteSchema = z.object({
 });
 
 // ── LIST & SUMMARY ──
-router.get('/', authenticate, requireStaff(), requireFeature('invoicing'), asyncHandler((req, res) => invoicesController.listInvoices(req, res)));
-router.get('/audit', authenticate, requireAdmin(), requireFeature('invoicing'), asyncHandler((req, res) => invoicesController.getInvoiceAuditTrail(req, res)));
-router.get('/gst-summary', authenticate, requireAdmin(), requireFeature('invoicing'), asyncHandler((req, res) => invoicesController.getGstSummary(req, res)));
-router.get('/export/gstr1', authenticate, requireAdmin(), requireFeature('invoicing'), asyncHandler((req, res) => invoicesController.getGstr1Export(req, res)));
+router.get('/', authenticate, requireStaff(), requireFeature('invoicing'), asyncHandler((req, res, next) => invoicesController.listInvoices(req, res, next)));
+router.get('/gst-summary', authenticate, requireSecondary(), requireFeature('invoicing'), asyncHandler((req, res, next) => invoicesController.getGstSummary(req, res, next)));
+router.get('/export/gstr1', authenticate, requireSecondary(), requireFeature('invoicing'), asyncHandler((req, res, next) => invoicesController.getGstr1Export(req, res, next)));
 
 // ── PUBLIC SHARE ──
-router.get('/share/:token', asyncHandler((req, res) => invoicesController.getPublicInvoiceShare(req, res)));
+router.get('/share/:token', asyncHandler((req, res, next) => invoicesController.getPublicInvoiceShare(req, res, next)));
 
 // ── DETAIL ──
-router.get('/:id', authenticate, requireStaff(), requireFeature('invoicing'), asyncHandler((req, res) => invoicesController.getInvoiceById(req, res)));
-router.get('/:id/pdf-data', authenticate, requireStaff(), requireFeature('invoicing'), asyncHandler((req, res) => invoicesController.getInvoicePdfData(req, res)));
-router.get('/:id/pdf', authenticate, requireStaff(), requireFeature('invoicing'), asyncHandler((req, res) => invoicesController.getInvoicePdf(req, res)));
+router.get('/:id', authenticate, requireStaff(), requireFeature('invoicing'), asyncHandler((req, res, next) => invoicesController.getInvoiceById(req, res, next)));
+router.get('/:id/pdf', authenticate, requireStaff(), requireFeature('invoicing'), asyncHandler((req, res, next) => invoicesController.getInvoicePdf(req, res, next)));
 
 // ── ACTIONS ──
-router.post('/', authenticate, requireStaff(), requireWriteAccess, requireFeature('invoicing'), validate(invoiceCreateSchema), asyncHandler((req, res) => invoicesController.createInvoice(req, res)));
-router.patch('/:id', authenticate, requireStaff(), requireWriteAccess, requireFeature('invoicing'), asyncHandler((req, res) => invoicesController.updateInvoice(req, res)));
-router.delete('/:id', authenticate, requireAdmin(), requireWriteAccess, requireFeature('invoicing'), asyncHandler((req, res) => invoicesController.deleteInvoice(req, res)));
-router.post('/:id/credit-note', authenticate, requireAdmin(), requireWriteAccess, requireFeature('invoicing'), validate(creditNoteSchema), asyncHandler((req, res) => invoicesController.createCreditNote(req, res)));
-router.post('/:id/create-payment-link', authenticate, requireStaff(), requireWriteAccess, requireFeature('invoicing'), asyncHandler((req, res) => invoicesController.createPaymentLink(req, res)));
+router.post('/', authenticate, requireStaff(), requireWriteAccess, requireFeature('invoicing'), validate(invoiceCreateSchema), asyncHandler((req, res, next) => invoicesController.createInvoice(req, res, next)));
+router.patch('/:id', authenticate, requireStaff(), requireWriteAccess, requireFeature('invoicing'), asyncHandler((req, res, next) => invoicesController.updateInvoice(req, res, next)));
+router.delete('/:id', authenticate, requireAdmin(), requireWriteAccess, requireFeature('invoicing'), asyncHandler((req, res, next) => invoicesController.deleteInvoice(req, res, next)));
+router.post('/:id/recalculate', authenticate, requireStaff(), requireWriteAccess, asyncHandler((req, res, next) => invoicesController.recalculateInvoice(req, res, next)));
 
 export default router;

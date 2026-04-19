@@ -8,7 +8,7 @@ function mapSupabaseError(err) {
     case '23505': // unique_violation
       return { status: 409, message: 'Conflict: Record already exists.' };
     case '23503': // foreign_key_violation
-      return { status: 400, message: 'Invalid relationship: Referenced record does not exist.' };
+      return { status: 400, message: 'VERIFY_FK_ID_FAIL: Referenced record does not exist.' };
     case '23502': // not_null_violation
       return { status: 400, message: 'Missing required field in database.' };
     case 'PGRST116': // Single row expected but 0 found
@@ -32,17 +32,20 @@ function asyncHandler(fn) {
 
 function errorHandler(err, req, res, next) {
   // eslint-disable-next-line no-console
-  logger.error('[errorHandler]', err);
-
   if (res.headersSent) {
     return next(err);
   }
 
-  // Intercept and mapped structured PostgreSQL database codes natively
   const mapped = mapSupabaseError(err);
   
   if (mapped) {
-    return res.status(mapped.status).json({ error: mapped.message, code: err.code });
+    return res.status(mapped.status).json({ 
+      error: mapped.message, 
+      original_message: err.message,
+      code: err.code,
+      details: err.details || err.detail,
+      raw: err
+    });
   }
 
   // Fallback handler

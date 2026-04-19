@@ -12,11 +12,14 @@ import { timeAgo } from '@/utils/time';
 import { VisaStatus, PassportCustody, VisaTracking } from '../types/visa';
 import { clsx } from 'clsx';
 import { CreateVisaDrawer } from '../components/CreateVisaDrawer';
+import { DocumentsTab } from '@/shared/components/DocumentsTab';
+import { X } from 'lucide-react';
 
 export const VisaListPage: React.FC = () => {
   const navigate = useNavigate();
   const { visas, isLoading, filters, setFilters, deleteVisa } = useVisaList();
   const [isDrawerOpen, setIsDrawerOpen] = useState(false);
+  const [selectedVisa, setSelectedVisa] = useState<VisaTracking | null>(null);
 
   // Status breakdown for filters/tabs
   const stats = useMemo(() => {
@@ -192,7 +195,7 @@ export const VisaListPage: React.FC = () => {
                     </td>
                     <td className="px-8 py-6 text-right">
                        <div className="flex items-center justify-end gap-2">
-                          <button onClick={() => navigate(`/visa/${v.id}`)} className="p-2.5 bg-white border border-slate-100 rounded-xl hover:bg-indigo-50 hover:text-indigo-600 transition-all shadow-sm">
+                          <button onClick={() => setSelectedVisa(v)} className="p-2.5 bg-white border border-slate-100 rounded-xl hover:bg-indigo-50 hover:text-indigo-600 transition-all shadow-sm">
                              <Eye className="w-4 h-4" />
                           </button>
                           <button onClick={() => deleteVisa(v.id)} className="p-2.5 bg-white border border-slate-100 rounded-xl hover:bg-red-50 hover:text-red-500 transition-all shadow-sm">
@@ -209,6 +212,39 @@ export const VisaListPage: React.FC = () => {
       </div>
 
       <CreateVisaDrawer isOpen={isDrawerOpen} onClose={() => setIsDrawerOpen(false)} />
+
+      {/* Visa Documents Panel */}
+      {selectedVisa && (
+        <>
+          <div
+            className="fixed inset-0 bg-slate-900/40 backdrop-blur-sm z-40"
+            onClick={() => setSelectedVisa(null)}
+          />
+          <div className="fixed inset-y-0 right-0 w-full max-w-lg bg-white border-l border-slate-200 shadow-2xl z-50 flex flex-col animate-in slide-in-from-right duration-300">
+            {/* Panel Header */}
+            <div className="p-6 border-b border-slate-100 flex items-start justify-between">
+              <div>
+                <p className="text-[10px] font-black uppercase tracking-widest text-indigo-600 mb-1">Visa Documents</p>
+                <h2 className="text-xl font-black text-slate-900 uppercase italic tracking-tight">{selectedVisa.traveler_name}</h2>
+                <p className="text-xs text-slate-400 font-bold mt-1">{selectedVisa.visa_country} · {selectedVisa.visa_type}</p>
+              </div>
+              <button
+                onClick={() => setSelectedVisa(null)}
+                className="p-2 hover:bg-slate-100 rounded-xl text-slate-400 transition-colors"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+            {/* Documents Tab content */}
+            <div className="flex-1 overflow-y-auto p-6">
+              <DocumentsTab
+                entityType={selectedVisa.lead_id ? 'lead' : 'customer'}
+                entityId={(selectedVisa.lead_id || selectedVisa.customer_id)!}
+              />
+            </div>
+          </div>
+        </>
+      )}
     </div>
   );
 };

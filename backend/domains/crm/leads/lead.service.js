@@ -143,7 +143,7 @@ class LeadService {
 
     let query = supabaseAdmin
       .from('leads')
-      .select('*, travel_consultant:users!leads_assigned_to_fkey(name)', { count: 'exact' })
+      .select('*, travel_consultant:users!assigned_to(name)', { count: 'exact' })
       .eq('tenant_id', tenantId)
       .is('deleted_at', null)
       .order('created_at', { ascending: false })
@@ -309,6 +309,173 @@ class LeadService {
 
     if (error) throw error;
     return data || [];
+  }
+
+  /**
+   * Pipeline Analytics & Conversion Funnel
+   */
+  async getAnalytics(tenantId) {
+    const { data: leads, error } = await supabaseAdmin
+      .from('leads')
+      .select('status, budget, profit, created_at')
+      .eq('tenant_id', tenantId)
+      .is('deleted_at', null);
+
+    if (error) throw error;
+
+    const pipeline = {
+      new: 0, contacted: 0, quote_sent: 0, negotiating: 0, converted: 0, lost: 0, on_hold: 0
+    };
+    
+    let totalBudget = 0;
+    let totalProfit = 0;
+    let convertedCount = 0;
+
+    leads.forEach(l => {
+      pipeline[l.status]++;
+      if (l.status === 'converted') {
+        convertedCount++;
+        totalProfit += Number(l.profit || 0);
+      }
+      totalBudget += Number(l.budget || 0);
+    });
+
+    const conversionRate = leads.length > 0 ? (convertedCount / leads.length) * 100 : 0;
+
+    return {
+      pipeline_counts: pipeline,
+      total_leads: leads.length,
+      conversion_rate: conversionRate.toFixed(2),
+      average_lead_value: leads.length > 0 ? (totalBudget / leads.length).toFixed(2) : 0,
+      total_potential_profit: totalProfit
+    };
+  }
+
+  /**
+   * Lead Notes Logic
+   */
+  async getLeadNotes(tenantId, leadId) {
+    const { data, error } = await supabaseAdmin
+      .from('lead_notes')
+      .select('*, user:users!user_id(name)')
+      .eq('lead_id', leadId)
+      .eq('tenant_id', tenantId)
+      .is('deleted_at', null)
+      .order('created_at', { ascending: false });
+
+    if (error) throw error;
+    return data;
+  }
+
+  async addLeadNote(tenantId, userId, leadId, content) {
+    const { data, error } = await supabaseAdmin
+      .from('lead_notes')
+      .insert({
+        tenant_id: tenantId,
+        lead_id: leadId,
+        user_id: userId,
+        content
+      })
+      .select('*, user:users!user_id(name)')
+      .single();
+
+    if (error) throw error;
+    return data;
+  }
+
+  /**
+   * Follow-up Management
+   */
+  async getLeadFollowups(tenantId, leadId) {
+    const { data, error } = await supabaseAdmin
+      .from('lead_followups')
+      .select('*')
+      .eq('lead_id', leadId)
+      .eq('tenant_id', tenantId)
+      .is('deleted_at', null)
+      .order('due_date', { ascending: true });
+
+    if (error) throw error;
+    return data;
+  }
+
+  async addLeadFollowup(tenantId, userId, leadId, followupData) {
+    const { data, error } = await supabaseAdmin
+      .from('lead_followups')
+      .insert({
+        tenant_id: tenantId,
+        lead_id: leadId,
+        user_id: userId,
+        due_date: followupData.followup_date,
+        note: followupData.note
+      })
+      .select()
+      .single();
+
+    if (error) throw error;
+    return data;
+  }
+
+  /**
+   * Communication Recording (Lead Specific)
+   */
+  async recordLeadCommunication(tenantId, userId, leadId, commData) {
+    const { data, error } = await supabaseAdmin
+      .from('lead_communications')
+      .insert({
+        tenant_id: tenantId,
+        lead_id: leadId,
+        user_id: userId,
+        comm_type: commData.comm_type,
+        direction: commData.direction,
+        summary: commData.summary,
+        duration_mins: commData.duration_mins,
+        comm_date: commData.comm_date || new Date().toISOString()
+      })
+      .select()
+      .single();
+
+    if (error) throw error;
+    return data;
+  }
+
+  /**
+   * Stale Lead Detection (for IvoBot)
+   * Leads in 'new' status for 3+ days
+   */
+  async checkStaleLeads() {
+    const threeDaysAgo = new Date();
+    threeDaysAgo.setDate(threeDaysAgo.getDate() - 3);
+
+    const { data: staleLeads, error } = await supabaseAdmin
+      .from('leads')
+      .select('id, tenant_id, customer_name, assigned_to, created_at')
+      .eq('status', 'new')
+      .lt('created_at', threeDaysAgo.toISOString())
+      .is('deleted_at', null);
+
+    if (error) throw error;
+    if (!staleLeads || staleLeads.length === 0) return { count: 0 };
+
+    const notifications = [];
+    for (const lead of staleLeads) {
+      if (lead.assigned_to) {
+        notifications.push({
+          user_id: lead.assigned_to,
+          tenant_id: lead.tenant_id,
+          notif_type: 'lead_status_changed',
+          title: 'Action Required: Stale Lead',
+          message: `${lead.customer_name} has been in "New" status for over 3 days. Please follow up.`,
+          lead_id: lead.id
+        });
+      }
+    }
+
+    if (notifications.length > 0) {
+      await supabaseAdmin.from('notifications').insert(notifications);
+    }
+
+    return { count: staleLeads.length };
   }
 }
 

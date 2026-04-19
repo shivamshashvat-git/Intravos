@@ -1,38 +1,33 @@
 import notificationService from './notifications.service.js';
 import response from '../../../core/utils/responseHandler.js';
 
-/**
- * NotificationsController — Industrialized Multi-Tenant Alerting
- */
-class NotificationsController {
-  
-  async get_all(req, res, next) {
+class NotificationController {
+  async listNotifications(req, res, next) {
     try {
-      const result = await notificationService.listNotifications(req.user.tenantId, req.user.id, req.query);
-      return response.success(res, result);
+      const data = await notificationService.listNotifications(req.user.tenantId, req.user.id);
+      return response.success(res, data);
     } catch (error) {
       next(error);
     }
   }
 
-  async patch_read(req, res, next) {
+  async markAsRead(req, res, next) {
     try {
       const data = await notificationService.markAsRead(req.user.tenantId, req.user.id, req.params.id);
-      return response.success(res, { notification: data }, 'Alert acknowledged');
+      return response.success(res, data, 'Notification marked as read');
     } catch (error) {
-      if (error.message.includes('not found')) return response.error(res, error.message, 404);
       next(error);
     }
   }
 
-  async patch_read_all(req, res, next) {
+  async markAllAsRead(req, res, next) {
     try {
-      const data = await notificationService.markAllAsRead(req.user.tenantId, req.user.id);
-      return response.success(res, data, 'All alerts marked as acknowledged');
+      await notificationService.markAllAsRead(req.user.tenantId, req.user.id);
+      return response.success(res, null, 'All notifications marked as read');
     } catch (error) {
       next(error);
     }
   }
 }
 
-export default new NotificationsController();
+export default new NotificationController();

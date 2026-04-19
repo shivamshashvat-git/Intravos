@@ -9,7 +9,7 @@ import { supabaseAdmin } from '../../../providers/database/supabase.js';
  */
 class PaymentsController {
   
-  async get__0(req, res, next) {
+  async listTransactions(req, res, next) {
     try {
       const data = await paymentService.listTransactions(req.user.tenantId, req.query);
       return response.success(res, data);
@@ -18,7 +18,7 @@ class PaymentsController {
     }
   }
 
-  async post_record_1(req, res, next) {
+  async recordCustomerPayment(req, res, next) {
     try {
       const payment = await paymentService.recordCustomerPayment(req.user.tenantId, req.user.id, req.body);
       return response.success(res, { payment }, 'Customer payment registered', 201);
@@ -27,7 +27,7 @@ class PaymentsController {
     }
   }
 
-  async post_supplier_2(req, res, next) {
+  async recordSupplierPayment(req, res, next) {
     try {
       const payment = await paymentService.recordSupplierPayment(req.user.tenantId, req.user.id, req.body);
       return response.success(res, { payment }, 'Supplier payout registered', 201);
@@ -36,26 +36,28 @@ class PaymentsController {
     }
   }
 
-  async get_reminder_url_5(req, res, next) {
+  async updatePayment(req, res, next) {
     try {
-      const { lead_id, amount } = req.query;
-      if (!lead_id) return response.error(res, 'lead_id required', 400);
-
-      const reminder = await paymentService.getReminderData(req.user.tenantId, lead_id, amount);
-      
-      const msg = await messageService.renderFromDb(req.user.tenantId, 'payment_reminder', reminder);
-
-      const url = reminder.customer_phone ? messageService.getWhatsAppLink(reminder.customer_phone, msg) : null;
-      return response.success(res, { url });
+      const payment = await paymentService.updatePayment(req.user.tenantId, req.user.id, req.params.id, req.body);
+      return response.success(res, { payment }, 'Payment updated successfully');
     } catch (error) {
-      if (error.message.includes('not found')) return response.error(res, error.message, 404);
       next(error);
     }
   }
 
-  async get_id_receipt_9(req, res, next) {
+  async deletePayment(req, res, next) {
+    try {
+      await paymentService.deletePayment(req.user.tenantId, req.params.id);
+      return response.success(res, null, 'Payment record removed');
+    } catch (error) {
+      next(error);
+    }
+  }
+
+  async getPaymentReceiptPdf(req, res, next) {
     try {
       const payment = await paymentService.getReceiptData(req.user.tenantId, req.params.id);
+      if (!payment) return response.error(res, 'Payment not found', 404);
 
       const branding = await fetchTenantBranding(supabaseAdmin, req.user.tenantId);
       const pdf = await generatePdf('payment_receipt', payment, branding);
@@ -64,12 +66,11 @@ class PaymentsController {
       res.setHeader('Content-Disposition', `inline; filename="receipt-${payment.id}.pdf"`);
       res.send(pdf);
     } catch (error) {
-      if (error.message.includes('not found')) return response.error(res, error.message, 404);
       next(error);
     }
   }
 
-  async get_accounts_6(req, res, next) {
+  async listBankAccounts(req, res, next) {
     try {
       const data = await paymentService.listBankAccounts(req.user.tenantId);
       return response.success(res, { accounts: data });

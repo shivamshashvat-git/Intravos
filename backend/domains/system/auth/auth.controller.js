@@ -1,6 +1,6 @@
 import authService from './auth.service.js';
-import tenantService from '../tenants/tenant.service.js';
-import userService from '../users/user.service.js';
+import tenantService from '../tenants/tenants.service.js';
+import usersService from '../users/users.service.js';
 import emailService from '../../../providers/communication/emailService.js';
 import demoService from '../public/demoService.js';
 import response from '../../../core/utils/responseHandler.js';
@@ -28,7 +28,7 @@ class AuthController {
 
       if (tenantId) {
         // Professional Tracking
-        await userService.update(userId, { 
+        await usersService.update(userId, { 
           last_ip_address: ip, 
           last_user_agent: userAgent,
           last_login_at: new Date().toISOString()
@@ -79,17 +79,17 @@ class AuthController {
       });
 
       // 3. Provision Admin User via Service
-      const user = await userService.createUser(tenant.id, {
+      const user = await usersService.createUser(tenant.id, {
         id: authData.user.id,
         email,
         name,
         phone,
-        role: 'admin'
+        role: 'agency_admin'
       });
 
       // 4. Bind Identity to Profile
       await supabaseAdmin.auth.admin.updateUserById(authData.user.id, {
-        app_metadata: { tenant_id: tenant.id, role: 'admin' }
+        app_metadata: { tenant_id: tenant.id, role: 'agency_admin' }
       });
 
       // 5. Seed Experience
@@ -115,7 +115,7 @@ class AuthController {
    */
   async getMe(req, res) {
     try {
-      const profile = await userService.getById(req.user.id);
+      const profile = await usersService.getById(req.user.id);
       return response.success(res, {
         user: req.user,
         tenant: req.tenant,

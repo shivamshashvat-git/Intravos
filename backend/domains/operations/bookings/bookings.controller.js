@@ -1,4 +1,5 @@
 import bookingService from './booking.service.js';
+import cancellationService from '../cancellations/cancellation.service.js';
 import response from '../../../core/utils/responseHandler.js';
 import { generatePdf, fetchTenantBranding } from '../../../providers/pdf-engine/pdfEngine.js';
 import { supabaseAdmin } from '../../../providers/database/supabase.js';
@@ -58,6 +59,18 @@ class BookingsController {
   }
 
   /**
+   * List all services for a specific booking
+   */
+  async getBookingServices(req, res, next) {
+    try {
+      const services = await bookingService.getBookingServices(req.user.tenantId, req.params.id);
+      return response.success(res, { services });
+    } catch (error) {
+      next(error);
+    }
+  }
+
+  /**
    * Add a service/item to a booking
    */
   async addBookingService(req, res, next) {
@@ -73,14 +86,24 @@ class BookingsController {
    * Update specific booking service
    */
   async updateBookingService(req, res, next) {
-    return response.error(res, 'Method not implemented', 501);
+    try {
+      const service = await bookingService.updateService(req.user.tenantId, req.params.serviceId, req.body);
+      return response.success(res, { service }, 'Service updated');
+    } catch (error) {
+      next(error);
+    }
   }
 
   /**
    * Remove service from booking
    */
   async deleteBookingService(req, res, next) {
-    return response.error(res, 'Method not implemented', 501);
+    try {
+      await bookingService.deleteService(req.user.tenantId, req.params.serviceId);
+      return response.success(res, null, 'Service removed from booking');
+    } catch (error) {
+      next(error);
+    }
   }
 
   /**
@@ -116,7 +139,13 @@ class BookingsController {
    * Process booking cancellation
    */
   async cancelBooking(req, res, next) {
-    return response.error(res, 'Cancellation logic requires specialized workflow implementation', 501);
+    try {
+      const payload = { ...req.body, booking_id: req.params.id };
+      const cancellation = await cancellationService.createCancellation(req.user.tenantId, req.user.id, payload);
+      return response.success(res, { cancellation }, 'Booking cancelled successfully');
+    } catch (error) {
+      next(error);
+    }
   }
 
   /**
@@ -138,6 +167,15 @@ class BookingsController {
     try {
       const tracker = await bookingService.getPnrTracker(req.user.tenantId, req.query);
       return response.success(res, { tracker });
+    } catch (error) {
+      next(error);
+    }
+  }
+
+  async getBookingHubAnalytics(req, res, next) {
+    try {
+      const analytics = await bookingService.getBookingHubAnalytics(req.user.tenantId);
+      return response.success(res, { analytics });
     } catch (error) {
       next(error);
     }

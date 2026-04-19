@@ -23,15 +23,15 @@ export const SettingsPage: React.FC = () => {
   const [activeTab, setActiveTab] = useState('agency');
   const { tenant, members, bankAccounts, isLoading, isSaving, updateProfile, uploadLogo, refresh } = useSettings();
   
-  const isAdmin = user?.role === 'admin';
+  const isAdmin = ['admin', 'agency_admin', 'super_admin'].includes(user?.role || '');
+  const isSecondary = isAdmin || user?.role === 'secondary_admin';
 
   useEffect(() => {
     const hash = location.hash.replace('#', '');
     if (hash) setActiveTab(hash);
   }, [location.hash]);
 
-  const tabs = [
-    { id: 'agency', label: 'Agency Profile', icon: Building2 },
+    { id: 'agency', label: 'Agency Profile', icon: Building2, adminOnly: true },
     { id: 'team', label: 'Team Members', icon: Users, adminOnly: true },
     { id: 'invoice', label: 'Invoice & Quote', icon: FileText, adminOnly: true },
     { id: 'bank', label: 'Bank Accounts', icon: Landmark, adminOnly: true },
@@ -250,7 +250,7 @@ const TeamMembersSection = ({ members, maxSeats, onRefresh }: any) => {
     if (memberId === user?.id) return toast.error('Self-Termination blocked');
     if (!window.confirm('Terminate this personnel node connection?')) return;
     try {
-       await settingsService.updateMember(memberId, { deleted_at: new Date().toISOString() } as any);
+       await settingsService.deleteMember(memberId);
        toast.success('Personnel node disconnected');
        onRefresh();
     } catch (e) {
@@ -308,17 +308,20 @@ const TeamMembersSection = ({ members, maxSeats, onRefresh }: any) => {
                      </td>
                      <td className="py-8 px-10">
                         <select 
-                          disabled={m.id === user?.id}
+                          disabled={m.id === user?.id || (user?.role === 'secondary_admin' && m.role !== 'staff')}
                           className={clsx(
                             "px-4 py-2 rounded-xl text-[10px] font-black uppercase tracking-widest border transition-all cursor-pointer",
-                            m.role === 'admin' ? "bg-indigo-50 text-indigo-600 border-indigo-100" : "bg-slate-50 text-slate-400 border-slate-100"
+                            ['admin', 'agency_admin'].includes(m.role) ? "bg-indigo-50 text-indigo-600 border-indigo-100" : 
+                            m.role === 'secondary_admin' ? "bg-emerald-50 text-emerald-600 border-emerald-100" :
+                            "bg-slate-50 text-slate-400 border-slate-100"
                           )}
                           value={m.role}
                           onChange={(e) => handleRoleChange(m.id, e.target.value)}
                         >
-                           <option value="admin">Administrator</option>
+                           <option value="agency_admin">Agency Admin</option>
+                           <option value="secondary_admin">Secondary Admin</option>
                            <option value="staff">Operational Staff</option>
-                           <option value="partner">Strategic Partner</option>
+                           <option value="admin">Legacy Admin</option>
                         </select>
                      </td>
                      <td className="py-8 px-10 text-right">

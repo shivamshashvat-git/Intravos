@@ -201,7 +201,7 @@ class AdminService {
 
     let targetQuery = supabaseAdmin.from('users').select('id, tenant_id, email, name, role, is_active, created_at').eq('is_active', true);
     if (user_id) targetQuery = targetQuery.eq('id', user_id);
-    else targetQuery = targetQuery.eq('tenant_id', tenant_id).eq('role', 'admin').order('created_at', { ascending: true }).limit(1);
+    else targetQuery = targetQuery.eq('tenant_id', tenant_id).eq('role', 'agency_admin').order('created_at', { ascending: true }).limit(1);
 
     const targetResponse = user_id ? await targetQuery.single() : await targetQuery;
     const targetUser = user_id ? targetResponse.data : targetResponse.data?.[0];

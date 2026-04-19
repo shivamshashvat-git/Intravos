@@ -11,8 +11,8 @@ class CustomersController {
    */
   async listCustomers(req, res, next) {
     try {
-      const { search, page = 1, limit = 50 } = req.query;
-      const result = await customerService.getCustomers(req.user.tenantId, { search, page, limit });
+      const { search, customer_type, tags, page = 1, limit = 50 } = req.query;
+      const result = await customerService.getCustomers(req.user.tenantId, { search, customer_type, tags, page, limit });
       return response.success(res, result);
     } catch (error) {
       next(error);
@@ -26,7 +26,11 @@ class CustomersController {
     try {
       const customer = await customerService.getCustomerById(req.user.tenantId, req.params.id);
       if (!customer) return response.error(res, 'Customer not found', 404);
-      return response.success(res, { customer });
+      
+      // Calculate health on the fly for detail view
+      const health = await customerService.calculateCustomerHealth(req.user.tenantId, req.params.id);
+      
+      return response.success(res, { customer, health });
     } catch (error) {
       next(error);
     }
@@ -37,7 +41,10 @@ class CustomersController {
    */
   async createCustomer(req, res, next) {
     try {
-      const customer = await customerService.createCustomer(req.user.tenantId, req.body);
+      const customer = await customerService.createCustomer(req.user.tenantId, {
+        ...req.body,
+        created_by: req.user.id
+      });
       return response.success(res, { customer }, 'Customer created successfully', 201);
     } catch (error) {
       next(error);
@@ -70,57 +77,7 @@ class CustomersController {
   }
 
   /**
-   * Preview a merge between two customers
-   */
-  async getMergePreview(req, res, next) {
-    try {
-      const { keep_id, merge_id } = req.body;
-      const preview = await customerService.getMergePreview(req.user.tenantId, keep_id, merge_id);
-      return response.success(res, preview);
-    } catch (error) {
-      next(error);
-    }
-  }
-
-  /**
-   * Execute permanent customer merge
-   */
-  async mergeCustomers(req, res, next) {
-    try {
-      const { keep_id, merge_id, reason } = req.body;
-      const result = await customerService.performMerge(req.user.tenantId, req.user.id, keep_id, merge_id, reason);
-      return response.success(res, result, 'Customers merged successfully');
-    } catch (error) {
-      next(error);
-    }
-  }
-
-  /**
-   * List history of customer merges
-   */
-  async getMergeLogs(req, res, next) {
-    try {
-      const logs = await customerService.getMergeLogs(req.user.tenantId);
-      return response.success(res, logs);
-    } catch (error) {
-      next(error);
-    }
-  }
-
-  /**
-   * Privacy / GDPR Revocation (Anonymization)
-   */
-  async revokePrivacyConsent(req, res, next) {
-    try {
-      const customer = await customerService.anonymizeCustomer(req.user.tenantId, req.params.id);
-      return response.success(res, { customer }, 'Privacy revocation complete. PII has been scrambled.');
-    } catch (error) {
-      next(error);
-    }
-  }
-
-  /**
-   * Fetch associated travelers (family/colleagues)
+   * Fetch associated travelers
    */
   async getTravelers(req, res, next) {
     try {
@@ -136,28 +93,152 @@ class CustomersController {
    */
   async addTraveler(req, res, next) {
     try {
-      const traveler = await customerService.addTraveler(req.user.tenantId, req.params.id, req.body);
+      const traveler = await customerService.addTraveler(req.user.tenantId, req.params.id, {
+        ...req.body,
+        created_by: req.user.id
+      });
       return response.success(res, traveler, 'Traveler added', 201);
     } catch (error) {
       next(error);
     }
   }
 
-  /**
-   * Fetch unified activity timeline
-   */
-  async getCustomerTimeline(req, res, next) {
+  // ── ANALYTICS & DEDUP ──
+
+  async getDuplicatePhones(req, res, next) {
     try {
-      const timeline = await customerService.getCustomerTimeline(req.user.tenantId, req.params.id);
-      return response.success(res, { timeline });
+      const duplicates = await customerService.getDuplicatePhones(req.user.tenantId);
+      return response.success(res, duplicates);
     } catch (error) {
       next(error);
     }
   }
 
-  /**
-   * Fetch cross-module relations
-   */
+  // ── ENGAGEMENT ENGINE ──
+
+  async getUpcomingBirthdays(req, res, next) {
+    try {
+      const birthdays = await customerService.getUpcomingBirthdays(req.user.tenantId);
+      return response.success(res, birthdays);
+    } catch (error) {
+      next(error);
+    }
+  }
+
+  async getUpcomingAnniversaries(req, res, next) {
+    try {
+      const anniversaries = await customerService.getUpcomingAnniversaries(req.user.tenantId);
+      return response.success(res, anniversaries);
+    } catch (error) {
+      next(error);
+    }
+  }
+
+  async getDormantCustomers(req, res, next) {
+    try {
+      const dormant = await customerService.getDormantCustomers(req.user.tenantId);
+      return response.success(res, dormant);
+    } catch (error) {
+      next(error);
+    }
+  }
+
+  // ── MESSAGE TEMPLATES ──
+
+  async listMessageTemplates(req, res, next) {
+    try {
+      const templates = await customerService.getMessageTemplates(req.user.tenantId);
+      return response.success(res, templates);
+    } catch (error) {
+      next(error);
+    }
+  }
+
+  async createMessageTemplate(req, res, next) {
+    try {
+      const template = await customerService.createMessageTemplate(req.user.tenantId, req.body);
+      return response.success(res, template, 'Template created', 201);
+    } catch (error) {
+      next(error);
+    }
+  }
+
+  async updateMessageTemplate(req, res, next) {
+    try {
+      const template = await customerService.updateMessageTemplate(req.user.tenantId, req.params.id, req.body);
+      return response.success(res, template);
+    } catch (error) {
+      next(error);
+    }
+  }
+
+  async deleteMessageTemplate(req, res, next) {
+    try {
+      await customerService.deleteMessageTemplate(req.user.tenantId, req.params.id);
+      return response.success(res, null, 'Template deleted');
+    } catch (error) {
+      next(error);
+    }
+  }
+
+  // ── FEEDBACK & REFERRALS ──
+
+  async requestFeedback(req, res, next) {
+    try {
+      const result = await customerService.initiateFeedbackRequest(req.user.tenantId, req.user.id, req.body);
+      return response.success(res, result, 'Feedback link generated');
+    } catch (error) {
+      next(error);
+    }
+  }
+
+  async getFeedbackByToken(req, res, next) {
+    try {
+      const feedback = await customerService.getFeedbackByToken(req.params.token);
+      return response.success(res, feedback);
+    } catch (error) {
+      next(error);
+    }
+  }
+
+  async submitFeedback(req, res, next) {
+    try {
+      const result = await customerService.submitFeedback(req.params.token, req.body);
+      return response.success(res, result, 'Feedback submitted successfully');
+    } catch (error) {
+      next(error);
+    }
+  }
+
+  async listReferrals(req, res, next) {
+    try {
+      const referrals = await customerService.getReferrals(req.user.tenantId);
+      return response.success(res, referrals);
+    } catch (error) {
+      next(error);
+    }
+  }
+
+  async createReferral(req, res, next) {
+    try {
+      const referral = await customerService.createReferral(req.user.tenantId, req.body);
+      return response.success(res, referral, 'Referral logged', 201);
+    } catch (error) {
+      next(error);
+    }
+  }
+
+  async updateReferral(req, res, next) {
+    try {
+      const referral = await customerService.updateReferral(req.user.tenantId, req.params.id, req.body);
+      return response.success(res, referral);
+    } catch (error) {
+      next(error);
+    }
+  }
+
+  // ── RELATIONS ──
+
   async getCustomerBookings(req, res, next) {
     try {
       const data = await customerService.getCustomerBookings(req.user.tenantId, req.params.id);
@@ -179,24 +260,6 @@ class CustomersController {
   async getCustomerInvoices(req, res, next) {
     try {
       const data = await customerService.getCustomerInvoices(req.user.tenantId, req.params.id);
-      return response.success(res, data);
-    } catch (error) {
-      next(error);
-    }
-  }
-
-  async getCustomerVisas(req, res, next) {
-    try {
-      const data = await customerService.getCustomerVisas(req.user.tenantId, req.params.id);
-      return response.success(res, data);
-    } catch (error) {
-      next(error);
-    }
-  }
-
-  async getCustomerDocuments(req, res, next) {
-    try {
-      const data = await customerService.getCustomerDocuments(req.user.tenantId, req.params.id);
       return response.success(res, data);
     } catch (error) {
       next(error);

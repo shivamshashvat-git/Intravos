@@ -1,6 +1,7 @@
 import { supabaseAdmin, supabaseForUser } from '../../providers/database/supabase.js';
 import logger from '../utils/logger.js';
 import { enforceSubscription  } from './subscription.js';
+import config from '../config/index.js';
 
 async function resolveImpersonation(req, actorUser, accessToken) {
   const sessionToken = req.headers['x-impersonation-token'];
@@ -32,7 +33,7 @@ async function resolveImpersonation(req, actorUser, accessToken) {
 
   const { data: tenant, error: tenantError } = await supabaseAdmin
     .from('tenants')
-    .select('id, name, slug, plan, trial_end, is_active, features_enabled, features_locked, features_visible, subscription_status, subscription_start_date, subscription_end_date, grace_until, limited_until, suspended_at, deactivated_at, is_free, free_until, free_reason, annual_price, is_early_client')
+    .select('id, name, slug, plan, trial_end, is_active, features_enabled, subscription_status, subscription_start_date, subscription_end_date, grace_until, limited_until, deactivated_at, is_free, annual_price, is_early_client')
     .eq('id', session.target_tenant_id)
     .single();
 
@@ -86,7 +87,7 @@ async function authenticate(req, res, next) {
     // Check if tenant is active and not expired trial
     const { data: tenant, error: tenantErr } = await supabaseAdmin
       .from('tenants')
-      .select('id, name, slug, plan, trial_end, is_active, features_enabled, features_locked, features_visible, subscription_status, subscription_start_date, subscription_end_date, grace_until, limited_until, suspended_at, deactivated_at, is_free, free_until, free_reason, annual_price, is_early_client')
+      .select('id, name, slug, plan, trial_end, is_active, features_enabled, subscription_status, subscription_start_date, subscription_end_date, grace_until, limited_until, deactivated_at, is_free, annual_price, is_early_client')
       .eq('id', tenantId)
       .single();
 

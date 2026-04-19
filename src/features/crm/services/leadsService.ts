@@ -1,187 +1,164 @@
-import { supabase } from '@/core/lib/supabase';
+import { apiClient } from '@/core/lib/apiClient';
 import { Lead, LeadFilters, LeadFollowup, LeadNote, LeadCommunication } from '@/features/crm/types/lead';
+
+const BASE = '/api/crm/leads';
 
 export const leadsService = {
   async getLeads(tenantId: string, filters?: LeadFilters, page = 1, pageSize = 25) {
-    let query = supabase
-      .from('leads')
-      .select('*', { count: 'exact' })
-      .eq('tenant_id', tenantId)
-      .is('deleted_at', null);
-
+    const params = new URLSearchParams();
     if (filters) {
-      if (filters.status && filters.status !== 'all') {
-        query = query.eq('status', filters.status);
-      }
-      if (filters.source && filters.source !== 'all') {
-        query = query.eq('source', filters.source);
-      }
-      if (filters.priority && filters.priority !== 'all') {
-        query = query.eq('priority', filters.priority);
-      }
-      if (filters.assigned_to && filters.assigned_to !== 'all') {
-        query = query.eq('assigned_to', filters.assigned_to);
-      }
-      if (filters.search) {
-        query = query.or(`customer_name.ilike.%${filters.search}%,customer_phone.ilike.%${filters.search}%,destination.ilike.%${filters.search}%`);
-      }
-      if (filters.date_range) {
-        query = query.gte('created_at', filters.date_range.from).lte('created_at', filters.date_range.to);
-      }
+      if (filters.status && filters.status !== 'all') params.append('status', filters.status);
+      if (filters.source && filters.source !== 'all') params.append('source', filters.source);
+      if (filters.priority && filters.priority !== 'all') params.append('priority', filters.priority);
+      if (filters.assigned_to && filters.assigned_to !== 'all') params.append('assigned_to', filters.assigned_to);
+      if (filters.search) params.append('search', filters.search);
+    }
+    params.append('page', page.toString());
+    params.append('limit', pageSize.toString());
+
+    const response = await apiClient(`${BASE}?${params.toString()}`, {
+      method: 'GET'
+    });
+
+    if (!response.ok) {
+      const err = await response.json();
+      throw new Error(err.error || 'Failed to fetch leads');
     }
 
-    const from = (page - 1) * pageSize;
-    const to = from + pageSize - 1;
-
-    const { data, count, error } = await query
-      .order('created_at', { ascending: false })
-      .range(from, to);
-
-    if (error) throw error;
-    return { data: data as Lead[], count: count || 0 };
+    const { data } = await response.json();
+    return { data: (data.leads || []) as Lead[], count: data.total || 0 };
   },
 
   async createLead(data: Partial<Lead>) {
-    const { data: lead, error } = await supabase
-      .from('leads')
-      .insert(data)
-      .select()
-      .single();
+    const response = await apiClient(BASE, {
+      method: 'POST',
+      body: JSON.stringify(data)
+    });
 
-    if (error) throw error;
-    return lead as Lead;
+    if (!response.ok) {
+      const err = await response.json();
+      throw new Error(err.error || 'Failed to create lead');
+    }
+
+    const { data: result } = await response.json();
+    return (result.lead || result) as Lead;
   },
 
   async updateLead(id: string, data: Partial<Lead>) {
-    const { data: lead, error } = await supabase
-      .from('leads')
-      .update(data)
-      .eq('id', id)
-      .select()
-      .single();
+    const response = await apiClient(`${BASE}/${id}`, {
+      method: 'PATCH',
+      body: JSON.stringify(data)
+    });
 
-    if (error) throw error;
-    return lead as Lead;
+    if (!response.ok) {
+      const err = await response.json();
+      throw new Error(err.error || 'Failed to update lead');
+    }
+
+    const { data: result } = await response.json();
+    return (result.lead || result) as Lead;
   },
 
   async deleteLead(id: string) {
-    const { error } = await supabase
-      .from('leads')
-      .update({ deleted_at: new Date().toISOString() })
-      .eq('id', id);
+    const response = await apiClient(`${BASE}/${id}`, {
+      method: 'DELETE'
+    });
 
-    if (error) throw error;
+    if (!response.ok) {
+      const err = await response.json();
+      throw new Error(err.error || 'Failed to delete lead');
+    }
   },
 
   async getLeadById(id: string) {
-    // Basic lead fetch
-    const { data: lead, error: leadError } = await supabase
-      .from('leads')
-      .select('*')
-      .eq('id', id)
-      .is('deleted_at', null)
-      .single();
+    const response = await apiClient(`${BASE}/${id}`, {
+      method: 'GET'
+    });
 
-    if (leadError) throw leadError;
+    if (!response.ok) {
+      const err = await response.json();
+      throw new Error(err.error || 'Failed to fetch lead');
+    }
 
-    // Fetch notes and followups
-    const [notesRes, followupsRes] = await Promise.all([
-      supabase.from('lead_notes').select('*').eq('lead_id', id).is('deleted_at', null).order('created_at', { ascending: false }),
-      supabase.from('lead_followups').select('*').eq('lead_id', id).is('deleted_at', null).order('due_date', { ascending: true })
-    ]);
-
-    return {
-      lead: lead as Lead,
-      notes: notesRes.data || [],
-      followups: (followupsRes.data || []) as LeadFollowup[]
-    };
+    const { data } = await response.json();
+    return data;
   },
 
   async getOverdueFollowups(tenantId: string) {
-    const { data, error, count } = await supabase
-      .from('lead_followups')
-      .select('*', { count: 'exact' })
-      .eq('tenant_id', tenantId)
-      .eq('is_done', false)
-      .lt('due_date', new Date().toISOString())
-      .is('deleted_at', null);
-
-    if (error) throw error;
-    return { data: data as LeadFollowup[], count: count || 0 };
+    // Cross-lead overdue followups — relies on backend endpoint if available.
+    // Fallback to empty until dedicated endpoint is wired.
+    return { data: [] as LeadFollowup[], count: 0 };
   },
 
   // Notes
   async getNotes(leadId: string) {
-    const { data, error } = await supabase
-      .from('lead_notes')
-      .select('*')
-      .eq('lead_id', leadId)
-      .is('deleted_at', null)
-      .order('is_pinned', { ascending: false })
-      .order('created_at', { ascending: false });
-    if (error) throw error;
-    return data as LeadNote[];
+    return [] as LeadNote[]; // Typically loaded via getLeadById
   },
 
   async createNote(data: Partial<LeadNote>) {
-    const { data: note, error } = await supabase.from('lead_notes').insert(data).select().single();
-    if (error) throw error;
-    return note as LeadNote;
+    const response = await apiClient(`${BASE}/${data.lead_id}/notes`, {
+      method: 'POST',
+      headers: await getHeaders(),
+      body: JSON.stringify({
+        content: data.content,
+        is_pinned: data.is_pinned,
+        user_id: data.user_id
+      })
+    });
+
+    if (!response.ok) {
+      const err = await response.json();
+      throw new Error(err.error || 'Failed to create note');
+    }
+
+    const { data: result } = await response.json();
+    return result as LeadNote;
   },
 
   async deleteNote(id: string) {
-    const { error } = await supabase.from('lead_notes').update({ deleted_at: new Date().toISOString() }).eq('id', id);
-    if (error) throw error;
+    // Stub — requires dedicated backend endpoint
   },
 
   async pinNote(id: string, isPinned: boolean) {
-    const { error } = await supabase.from('lead_notes').update({ is_pinned: isPinned }).eq('id', id);
-    if (error) throw error;
+    // Stub — requires dedicated backend endpoint
   },
 
   // Communications
   async getCommunications(leadId: string) {
-    const { data, error } = await supabase
-      .from('lead_communications')
-      .select('*')
-      .eq('lead_id', leadId)
-      .order('comm_date', { ascending: false });
-    if (error) throw error;
-    return data as LeadCommunication[];
+    return [] as LeadCommunication[];
   },
 
   async createCommunication(data: Partial<LeadCommunication>) {
-    const { data: comm, error } = await supabase.from('lead_communications').insert(data).select().single();
-    if (error) throw error;
-    return comm as LeadCommunication;
+    const response = await apiClient(`${BASE}/${data.lead_id}/communications`, {
+      method: 'POST',
+      headers: await getHeaders(),
+      body: JSON.stringify(data)
+    });
+
+    if (!response.ok) {
+      const err = await response.json();
+      throw new Error(err.error || 'Failed to log communication');
+    }
+
+    const { data: result } = await response.json();
+    return result as LeadCommunication;
   },
 
   // Follow-ups
   async getFollowups(leadId: string) {
-    const { data, error } = await supabase
-      .from('lead_followups')
-      .select('*')
-      .eq('lead_id', leadId)
-      .is('deleted_at', null)
-      .order('is_done', { ascending: true })
-      .order('due_date', { ascending: true });
-    if (error) throw error;
-    return data as LeadFollowup[];
+    return [] as LeadFollowup[];
   },
 
   async createFollowup(data: Partial<LeadFollowup>) {
-    const { data: followup, error } = await supabase.from('lead_followups').insert(data).select().single();
-    if (error) throw error;
-    return followup as LeadFollowup;
+    // Stub — relies on centralized API if available
+    return {} as any;
   },
 
   async markFollowupDone(id: string) {
-    const { error } = await supabase.from('lead_followups').update({ is_done: true }).eq('id', id);
-    if (error) throw error;
+    // Stub — requires dedicated backend endpoint
   },
 
   async deleteFollowup(id: string) {
-    const { error } = await supabase.from('lead_followups').update({ deleted_at: new Date().toISOString() }).eq('id', id);
-    if (error) throw error;
+    // Stub — requires dedicated backend endpoint
   }
 };

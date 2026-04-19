@@ -1,22 +1,12 @@
 import { apiClient } from '@/core/lib/apiClient';
-import { supabase } from '@/core/lib/supabase';
 import { MarkupPreset, CreateMarkupPresetInput } from '../types/markupPreset';
 
-const BASE_URL = 'http://localhost:3000/api/finance/markup-presets';
-
-const getHeaders = async () => {
-  const { data: { session } } = await supabase.auth.getSession();
-  return {
-    'Content-Type': 'application/json',
-    'Authorization': `Bearer ${session?.access_token}`
-  };
-};
+const BASE_URL = (import.meta.env.VITE_API_URL || '') + '/api/finance/markup-presets';
 
 export const markupPresetsService = {
   async getMarkupPresets(): Promise<MarkupPreset[]> {
     const response = await apiClient(BASE_URL, {
-      method: 'GET',
-      headers: await getHeaders()
+      method: 'GET'
     });
     
     if (!response.ok) {
@@ -31,7 +21,7 @@ export const markupPresetsService = {
   async createMarkupPreset(data: CreateMarkupPresetInput): Promise<MarkupPreset> {
     const response = await apiClient(BASE_URL, {
       method: 'POST',
-      headers: await getHeaders(),
+      headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(data)
     });
     
@@ -47,7 +37,7 @@ export const markupPresetsService = {
   async updateMarkupPreset(id: string, data: Partial<CreateMarkupPresetInput>): Promise<MarkupPreset> {
     const response = await apiClient(`${BASE_URL}/${id}`, {
       method: 'PATCH',
-      headers: await getHeaders(),
+      headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(data)
     });
     
@@ -62,8 +52,7 @@ export const markupPresetsService = {
 
   async deleteMarkupPreset(id: string): Promise<void> {
     const response = await apiClient(`${BASE_URL}/${id}`, {
-      method: 'DELETE',
-      headers: await getHeaders()
+      method: 'DELETE'
     });
     
     if (!response.ok) {

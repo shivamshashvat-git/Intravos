@@ -1,3 +1,4 @@
+import { expenseSchema, updateExpenseSchema } from './expenses.schema.js';
 import expenseService from './expense.service.js';
 import response from '../../../core/utils/responseHandler.js';
 
@@ -9,7 +10,7 @@ class ExpensesController {
   /**
    * List Categorization Options
    */
-  async get_categories_0(req, res, next) {
+  async listCategories(req, res, next) {
     try {
       const categories = await expenseService.listCategories(req.user.tenantId);
       return response.success(res, { categories });
@@ -21,7 +22,7 @@ class ExpensesController {
   /**
    * Register New Expense Type
    */
-  async post_categories_1(req, res, next) {
+  async createCategory(req, res, next) {
     try {
       const category = await expenseService.createCategory(req.user.tenantId, req.body);
       return response.success(res, { category }, 'Category created', 201);
@@ -33,7 +34,7 @@ class ExpensesController {
   /**
    * Modify Category Metadata
    */
-  async patch_categories__id_2(req, res, next) {
+  async updateCategory(req, res, next) {
     try {
       const category = await expenseService.updateCategory(req.user.tenantId, req.params.id, req.body);
       return response.success(res, { category });
@@ -43,9 +44,21 @@ class ExpensesController {
   }
 
   /**
+   * Remove Expense Type
+   */
+  async deleteCategory(req, res, next) {
+    try {
+      const result = await expenseService.deleteCategory(req.user.tenantId, req.user.id, req.params.id);
+      return response.success(res, result, 'Category removed');
+    } catch (error) {
+      next(error);
+    }
+  }
+
+  /**
    * List Expenses with Financial Context
    */
-  async get__4(req, res, next) {
+  async listExpenses(req, res, next) {
     try {
       const data = await expenseService.listExpenses(req.user.tenantId, req.query);
       return response.success(res, data);
@@ -57,11 +70,13 @@ class ExpensesController {
   /**
    * Record Operational Outflow
    */
-  async post__5(req, res, next) {
+  async recordExpense(req, res, next) {
     try {
-      const expense = await expenseService.recordExpense(req.user.tenantId, req.user.id, req.body);
+      const validated = expenseSchema.parse(req.body);
+      const expense = await expenseService.recordExpense(req.user.tenantId, req.user.id, validated);
       return response.success(res, { expense }, 'Expense recorded', 201);
     } catch (error) {
+      if (error.name === 'ZodError') return response.error(res, error.errors[0]?.message, 400);
       next(error);
     }
   }
@@ -69,11 +84,13 @@ class ExpensesController {
   /**
    * Reconcile / Amend Expense
    */
-  async patch_id_6(req, res, next) {
+  async updateExpense(req, res, next) {
     try {
-      const expense = await expenseService.updateExpense(req.user.tenantId, req.params.id, req.body);
+      const validated = updateExpenseSchema.parse(req.body);
+      const expense = await expenseService.updateExpense(req.user.tenantId, req.params.id, validated);
       return response.success(res, { expense }, 'Expense updated');
     } catch (error) {
+      if (error.name === 'ZodError') return response.error(res, error.errors[0]?.message, 400);
       next(error);
     }
   }
@@ -81,7 +98,7 @@ class ExpensesController {
   /**
    * Reverse Expense Entry
    */
-  async delete_id_7(req, res, next) {
+  async deleteExpense(req, res, next) {
     try {
       const result = await expenseService.deleteExpense(req.user.tenantId, req.user.id, req.params.id);
       return response.success(res, result, 'Expense record reversed');

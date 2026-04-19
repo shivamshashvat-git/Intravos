@@ -33,7 +33,7 @@ export interface TeamMember {
   id: string;
   email: string;
   name: string;
-  role: 'admin' | 'staff' | 'partner';
+  role: 'super_admin' | 'platform_manager' | 'ivobot' | 'agency_admin' | 'secondary_admin' | 'admin' | 'staff' | 'partner';
   designation: string | null;
   phone: string | null;
   avatar_url: string | null;

@@ -19,7 +19,10 @@ import {
   Stamp,
   LibraryBig,
   Wallet,
-  Percent
+  Percent,
+  CalendarDays,
+  Shield,
+  XCircle
 } from 'lucide-react';
 import { useAuth } from '@/core/hooks/useAuth';
 import { NotificationBell } from '@/shared/components/NotificationBell';
@@ -51,6 +54,9 @@ export const AppShell: React.FC = () => {
     { name: 'Itineraries', to: '/itineraries', icon: Map },
     { name: 'Knowledge Bank', to: '/knowledge-bank', icon: LibraryBig },
     { name: 'Visa Tracking', to: '/visa', icon: Stamp },
+    { name: 'Insurance', to: '/insurance', icon: Shield },
+    { name: 'Cancellations', to: '/cancellations', icon: XCircle },
+    { name: 'Calendar', to: '/calendar', icon: CalendarDays },
     { type: 'header', name: 'Finance', icon: FileText },
     { name: 'Quotations', to: '/quotations', icon: FileText, indent: true },
     { name: 'Invoices', to: '/invoices', icon: CreditCard, indent: true },

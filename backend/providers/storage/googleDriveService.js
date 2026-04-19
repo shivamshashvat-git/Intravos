@@ -15,11 +15,14 @@ class GoogleDriveService {
 
   init() {
     try {
-      if (!process.env.GOOGLE_SERVICE_ACCOUNT_JSON || !this.folderId) return;
+      const raw = process.env.GOOGLE_SERVICE_ACCOUNT_JSON;
+      if (!raw || raw.includes('YOUR_SERVICE_ACCOUNT') || !this.folderId) {
+        logger.debug('[GoogleDriveService] Optional backup storage not configured. Dormant.');
+        return;
+      }
       
       // Support both raw JSON and base64-encoded JSON (base64 is required for .env single-line storage)
       let credentials;
-      const raw = process.env.GOOGLE_SERVICE_ACCOUNT_JSON;
       try {
         credentials = JSON.parse(raw);
       } catch {
@@ -35,7 +38,10 @@ class GoogleDriveService {
       this.driveClient = google.drive({ version: 'v3', auth });
       logger.info('[GoogleDriveService] Initialized successfully.');
     } catch (err) {
-      logger.warn('[GoogleDriveService] Initialization failed. Check JSON formatting.', err.message);
+      // Only warn if they actually tried to provide credentials but they are broken
+      if (process.env.GOOGLE_SERVICE_ACCOUNT_JSON && !process.env.GOOGLE_SERVICE_ACCOUNT_JSON.includes('YOUR_SERVICE_ACCOUNT')) {
+        logger.warn('[GoogleDriveService] Initialization failed. Check JSON formatting.', err.message);
+      }
     }
   }
 

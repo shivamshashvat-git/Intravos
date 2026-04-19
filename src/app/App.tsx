@@ -28,6 +28,12 @@ import { VisaListPage as VisaTracking } from '@/features/operations/pages/VisaLi
 import { DashboardPage as Dashboard } from '@/features/dashboard/pages/DashboardPage';
 import { VendorLedgerPage as VendorLedger } from '@/features/finance/pages/VendorLedgerPage';
 import { MarkupPresetsPage as MarkupPresets } from '@/features/finance/pages/MarkupPresetsPage';
+import { ExpensesPage as Expenses } from '@/features/finance/pages/ExpensesPage';
+import { CalendarPage as CalendarView } from '@/features/operations/pages/CalendarPage';
+import { InsurancePage as Insurance } from '@/features/operations/pages/InsurancePage';
+import { CancellationsPage as Cancellations } from '@/features/operations/pages/CancellationsPage';
+import { GroupBookingsPage as GroupBookings } from '@/features/operations/pages/GroupBookingsPage';
+import { GroupBookingDetailPage as GroupBookingDetail } from '@/features/operations/pages/GroupBookingDetailPage';
 
 const App: React.FC = () => {
   return (
@@ -61,16 +67,22 @@ const App: React.FC = () => {
             <Route path="/invoices/:id/edit" element={<InvoiceBuilder />} />
             <Route path="/vendor-ledger" element={<VendorLedger />} />
             <Route path="/markup-presets" element={<MarkupPresets />} />
+            <Route path="/finance/expenses" element={<Expenses />} />
             <Route path="/visa" element={<VisaTracking />} />
+            <Route path="/insurance" element={<Insurance />} />
+            <Route path="/cancellations" element={<Cancellations />} />
+            <Route path="/bookings/groups" element={<GroupBookings />} />
+            <Route path="/bookings/groups/:id" element={<GroupBookingDetail />} />
+            <Route path="/calendar" element={<CalendarView />} />
             <Route path="/tasks" element={<Tasks />} />
             <Route path="/notifications" element={<Notifications />} />
             <Route path="/settings" element={<Settings />} />
           </Route>
 
-          {/* Fallback */}
-          <Route path="*" element={<Navigate to="/dashboard" replace />} />
           {/* Public Routes */}
           <Route path="/trip/:share_token" element={<PublicItinerary />} />
+          {/* Fallback */}
+          <Route path="*" element={<Navigate to="/dashboard" replace />} />
         </Routes>
       </AuthProvider>
     </BrowserRouter>

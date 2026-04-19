@@ -25,12 +25,13 @@ import { maskPassport, maskAadhar, maskPAN } from '@/utils/mask';
 import { clsx } from 'clsx';
 import { twMerge } from 'tailwind-merge';
 import { CreateBookingDrawer } from '@/features/operations/components/CreateBookingDrawer';
+import { DocumentsTab } from '@/shared/components/DocumentsTab';
 
 function cn(...inputs: any[]) {
   return twMerge(clsx(inputs));
 }
 
-type TabType = 'overview' | 'travelers' | 'identity' | 'preferences';
+type TabType = 'overview' | 'travelers' | 'identity' | 'preferences' | 'documents';
 
 export const CustomerDetailPage: React.FC = () => {
   const { id } = useParams<{ id: string }>();
@@ -164,7 +165,7 @@ export const CustomerDetailPage: React.FC = () => {
 
       {/* Tab Navigation */}
       <div className="flex border-b border-slate-200">
-         {(['overview', 'travelers', 'identity', 'preferences'] as TabType[]).map(tab => (
+         {(['overview', 'travelers', 'identity', 'preferences', 'documents'] as TabType[]).map(tab => (
            <button 
              key={tab}
              onClick={() => setActiveTab(tab)}
@@ -581,6 +582,12 @@ export const CustomerDetailPage: React.FC = () => {
                     )}
                  </div>
               </div>
+           </div>
+         )}
+
+         {activeTab === 'documents' && id && (
+           <div className="max-w-3xl py-8">
+             <DocumentsTab entityType="customer" entityId={id} />
            </div>
          )}
       </div>

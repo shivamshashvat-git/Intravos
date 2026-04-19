@@ -9,7 +9,7 @@ class VendorLedgerController {
   /**
    * List Ledger Entries with Filters
    */
-  async get__0(req, res, next) {
+  async listEntries(req, res, next) {
     try {
       const ledger = await vendorLedgerService.listEntries(req.user.tenantId, req.query);
       return response.success(res, { ledger });
@@ -21,7 +21,7 @@ class VendorLedgerController {
   /**
    * Cash Flow Alerts & Summary
    */
-  async get_dashboard_1(req, res, next) {
+  async getDashboardSummary(req, res, next) {
     try {
       const summary = await vendorLedgerService.getDashboardSummary(req.user.tenantId);
       return response.success(res, summary);
@@ -33,7 +33,7 @@ class VendorLedgerController {
   /**
    * Record Manual Liability/Asset
    */
-  async post__2(req, res, next) {
+  async addEntry(req, res, next) {
     try {
       const entry = await vendorLedgerService.addEntry(req.user.tenantId, req.user.id, req.body);
       return response.success(res, { ledger_entry: entry }, 'Ledger entry recorded', 201);
@@ -45,7 +45,7 @@ class VendorLedgerController {
   /**
    * Settle Ledger Item
    */
-  async patch_id_mark_paid_3(req, res, next) {
+  async markPaid(req, res, next) {
     try {
       const entry = await vendorLedgerService.markPaid(req.user.tenantId, req.params.id, req.body);
       return response.success(res, { ledger_entry: entry }, 'Ledger entry settled');
@@ -57,7 +57,7 @@ class VendorLedgerController {
   /**
    * Net Supplier Position Audit
    */
-  async get_supplier__supplierId_balance_4(req, res, next) {
+  async getSupplierBalance(req, res, next) {
     try {
       const summary = await vendorLedgerService.getSupplierBalance(req.user.tenantId, req.params.supplierId);
       return response.success(res, { summary });

@@ -1,263 +1,138 @@
-import { supabase } from '@/core/lib/supabase';
+
 import { apiClient } from '@/core/lib/apiClient';
 import { Itinerary, ItineraryDay, ItineraryItem, ItineraryFilters, ItineraryWithDetails } from '@/features/operations/types/itinerary';
 
 export const itinerariesService = {
+  /**
+   * List itineraries with filters
+   */
   async getItineraries(tenantId: string, filters?: ItineraryFilters) {
-    let query = supabase
-      .from('itineraries')
-      .select('*')
-      .eq('tenant_id', tenantId)
-      .eq('is_template', false)
-      .is('deleted_at', null);
+    const params = new URLSearchParams();
+    if (filters?.lead_id) params.append('lead_id', filters.lead_id);
+    if (filters?.customer_id) params.append('customer_id', filters.customer_id);
+    if (filters?.booking_id) params.append('booking_id', filters.booking_id);
+    if (filters?.status && filters.status !== 'all') params.append('status', filters.status);
+    if (filters?.search) params.append('search', filters.search);
 
-    if (filters) {
-      if (filters.lead_id) query = query.eq('lead_id', filters.lead_id);
-      if (filters.customer_id) query = query.eq('customer_id', filters.customer_id);
-      if (filters.booking_id) query = query.eq('booking_id', filters.booking_id);
-      if (filters.status && filters.status !== 'all') query = query.eq('status', filters.status);
-      if (filters.search) {
-        query = query.or(`title.ilike.%${filters.search}%,destination.ilike.%${filters.search}%`);
-      }
-    }
-
-    const { data, error } = await query.order('created_at', { ascending: false });
-    if (error) throw error;
-    return data as Itinerary[];
+    const res = await apiClient(`/api/operations/itineraries?${params.toString()}`);
+    if (!res.ok) throw new Error('Failed to fetch itineraries');
+    const result = await res.json();
+    return result.data?.itineraries || result.data as Itinerary[];
   },
 
-  async getTemplates(tenantId: string) {
-    const { data, error } = await supabase
-      .from('itineraries')
-      .select('*')
-      .eq('tenant_id', tenantId)
-      .eq('is_template', true)
-      .is('deleted_at', null)
-      .order('template_name', { ascending: true });
-    if (error) throw error;
-    return data as Itinerary[];
+  /**
+   * Fetch itinerary by booking ID
+   */
+  async getItineraryByBooking(bookingId: string) {
+    const res = await apiClient(`/api/operations/itineraries/booking/${bookingId}`);
+    if (!res.ok) return null;
+    const result = await res.json();
+    return result.data?.itinerary;
   },
 
-  async getItineraryById(id: string, tenantId?: string) {
-    // Fetch itinerary
-    let query = supabase
-      .from('itineraries')
-      .select('*')
-      .eq('id', id)
-      .is('deleted_at', null);
-    
-    if (tenantId) query = query.eq('tenant_id', tenantId);
-
-    const { data: itinerary, error: iError } = await query.single();
-    if (iError) throw iError;
-
-    // Fetch days and items in one or two queries
-    const { data: days, error: dError } = await supabase
-      .from('itinerary_days')
-      .select('*, itinerary_items(*)')
-      .eq('itinerary_id', id)
-      .is('deleted_at', null)
-      .order('day_number', { ascending: true });
-    if (dError) throw dError;
-
-    // Nest items and sort them
-    const nestedDays = (days || []).map((day: any) => ({
-      ...day,
-      items: (day.itinerary_items || [])
-        .filter((item: any) => !item.deleted_at)
-        .sort((a: any, b: any) => a.sort_order - b.sort_order)
-    }));
-
-    return { ...itinerary, days: nestedDays } as ItineraryWithDetails;
-  },
-
-  async getItineraryBySlug(slug: string) {
-    const { data: itinerary, error: iError } = await supabase
-      .from('itineraries')
-      .select('*')
-      .eq('public_slug', slug)
-      .eq('is_public', true)
-      .is('deleted_at', null)
-      .single();
-    if (iError) return null;
-
-    const { data: days, error: dError } = await supabase
-      .from('itinerary_days')
-      .select('*, itinerary_items(*)')
-      .eq('itinerary_id', itinerary.id)
-      .is('deleted_at', null)
-      .order('day_number', { ascending: true });
-
-    const nestedDays = (days || []).map((day: any) => ({
-      ...day,
-      items: (day.itinerary_items || [])
-        .filter((item: any) => !item.deleted_at && item.item_type !== 'internal_note')
-        .sort((a: any, b: any) => a.sort_order - b.sort_order)
-    }));
-
-    return { ...itinerary, days: nestedDays } as ItineraryWithDetails;
-  },
-
-  async createItinerary(data: Partial<Itinerary>) {
-    const publicSlug = Math.random().toString(36).substring(2, 10);
-    const { data: itinerary, error } = await supabase
-      .from('itineraries')
-      .insert({ ...data, public_slug: publicSlug, is_public: false, status: 'draft' })
-      .select()
-      .single();
-    if (error) throw error;
-    return itinerary as Itinerary;
-  },
-
-  async updateItinerary(id: string, tenantId: string, data: Partial<Itinerary>) {
-    const { data: itinerary, error } = await supabase
-      .from('itineraries')
-      .update({ ...data, updated_at: new Date().toISOString() })
-      .eq('id', id)
-      .eq('tenant_id', tenantId)
-      .select()
-      .single();
-    if (error) throw error;
-    return itinerary as Itinerary;
-  },
-
-  async deleteItinerary(id: string, tenantId: string) {
-    await supabase
-      .from('itineraries')
-      .update({ deleted_at: new Date().toISOString() })
-      .eq('id', id)
-      .eq('tenant_id', tenantId);
-  },
-
-  async duplicateItinerary(id: string, overrides: Partial<Itinerary> = {}) {
-    const source = await this.getItineraryById(id);
-    const { id: _, created_at: __, updated_at: ___, share_token: ____, ...baseData } = source as any;
-    
-    // Create new itinerary
-    const newItinerary = await this.createItinerary({
-      ...baseData,
-      ...overrides,
-      is_shared: false,
-      is_template: false,
-      template_name: null
+  /**
+   * Create itinerary for a booking
+   */
+  async createBookingItinerary(bookingId: string, data: any) {
+    const res = await apiClient(`/api/operations/itineraries/booking/${bookingId}`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(data)
     });
-
-    // Duplicate Days and Items
-    for (const day of source.days) {
-      const { id: dId, itinerary_id: _____, itinerary_items: ______, ...dayData } = day as any;
-      const { data: newDay, error: dErr } = await supabase
-        .from('itinerary_days')
-        .insert({ ...dayData, itinerary_id: newItinerary.id })
-        .select()
-        .single();
-      
-      if (dErr) continue;
-
-      if (day.items.length > 0) {
-        const itemsToInsert = day.items.map(item => {
-          const { id: itId, day_id: _______, ...itData } = item as any;
-          return { ...itData, day_id: newDay.id };
-        });
-        await supabase.from('itinerary_items').insert(itemsToInsert);
-      }
-    }
-
-    return newItinerary;
+    if (!res.ok) throw new Error('Failed to create itinerary');
+    const result = await res.json();
+    return result.data?.itinerary;
   },
 
-  async saveAsTemplate(id: string, templateName: string) {
-    return this.duplicateItinerary(id, { is_template: true, template_name: templateName });
-  },
-
-  async loadTemplate(id: string, templateId: string) {
-    const res = await apiClient.post(`/api/itineraries/${id}/load-template/${templateId}`);
-    return res.data;
-  },
-
-  async promoteToTemplate(id: string, payload: any) {
-    const res = await apiClient.post(`/api/itineraries/${id}/promote-to-template`, payload);
-    return res.data;
+  /**
+   * Update itinerary core details
+   */
+  async updateItinerary(id: string, data: Partial<Itinerary>) {
+    const res = await apiClient(`/api/operations/itineraries/${id}`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(data)
+    });
+    if (!res.ok) throw new Error('Failed to update itinerary');
+    const result = await res.json();
+    return result.data?.itinerary;
   },
 
   // Day Ops
-  async addDay(itineraryId: string, tenantId: string, data: Partial<ItineraryDay>) {
-    const { data: day, error } = await supabase
-      .from('itinerary_days')
-      .insert({ ...data, itinerary_id: itineraryId, tenant_id: tenantId })
-      .select()
-      .single();
-    if (error) throw error;
-    return day as ItineraryDay;
+  async addDay(itineraryId: string, data: any) {
+    const res = await apiClient(`/api/operations/itineraries/${itineraryId}/days`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(data)
+    });
+    if (!res.ok) throw new Error('Failed to add day');
+    const result = await res.json();
+    return result.data?.day;
   },
 
-  async updateDay(id: string, tenantId: string, data: Partial<ItineraryDay>) {
-    const { data: day, error } = await supabase
-      .from('itinerary_days')
-      .update(data)
-      .eq('id', id)
-      .eq('tenant_id', tenantId)
-      .select()
-      .single();
-    if (error) throw error;
-    return day as ItineraryDay;
+  async updateDay(dayId: string, data: any) {
+    const res = await apiClient(`/api/operations/itineraries/days/${dayId}`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(data)
+    });
+    if (!res.ok) throw new Error('Failed to update day');
+    const result = await res.json();
+    return result.data?.day;
   },
 
-  async deleteDay(id: string, tenantId: string) {
-    await supabase
-      .from('itinerary_days')
-      .update({ deleted_at: new Date().toISOString() })
-      .eq('id', id)
-      .eq('tenant_id', tenantId);
-  },
-
-  async reorderDays(itineraryId: string, tenantId: string, dayIds: string[]) {
-    const updates = dayIds.map((id, index) => ({
-      id,
-      itinerary_id: itineraryId,
-      tenant_id: tenantId,
-      sort_order: index * 10,
-      day_number: index + 1
-    }));
-    const { error } = await supabase.from('itinerary_days').upsert(updates);
-    if (error) throw error;
+  async deleteDay(dayId: string) {
+    const res = await apiClient(`/api/operations/itineraries/days/${dayId}`, {
+      method: 'DELETE'
+    });
+    if (!res.ok) throw new Error('Failed to delete day');
   },
 
   // Item Ops
-  async addItem(dayId: string, tenantId: string, data: Partial<ItineraryItem>) {
-    const { data: item, error } = await supabase
-      .from('itinerary_items')
-      .insert({ ...data, day_id: dayId, tenant_id: tenantId })
-      .select()
-      .single();
-    if (error) throw error;
-    return item as ItineraryItem;
+  async addItem(dayId: string, data: any) {
+    const res = await apiClient(`/api/operations/itineraries/days/${dayId}/items`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(data)
+    });
+    if (!res.ok) throw new Error('Failed to add item');
+    const result = await res.json();
+    return result.data?.item;
   },
 
-  async updateItem(id: string, tenantId: string, data: Partial<ItineraryItem>) {
-    const { error } = await supabase
-      .from('itinerary_items')
-      .update(data)
-      .eq('id', id)
-      .eq('tenant_id', tenantId);
-    if (error) throw error;
+  async updateItem(itemId: string, data: any) {
+    const res = await apiClient(`/api/operations/itineraries/items/${itemId}`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(data)
+    });
+    if (!res.ok) throw new Error('Failed to update item');
+    const result = await res.json();
+    return result.data?.item;
   },
 
-  async deleteItem(id: string, tenantId: string) {
-    await supabase
-      .from('itinerary_items')
-      .update({ deleted_at: new Date().toISOString() })
-      .eq('id', id)
-      .eq('tenant_id', tenantId);
+  async deleteItem(itemId: string) {
+    const res = await apiClient(`/api/operations/itineraries/items/${itemId}`, {
+      method: 'DELETE'
+    });
+    if (!res.ok) throw new Error('Failed to delete item');
   },
 
-  async reorderItems(dayId: string, tenantId: string, itemIds: string[]) {
-    const updates = itemIds.map((id, index) => ({
-       id,
-       day_id: dayId,
-       tenant_id: tenantId,
-       sort_order: index * 10
-    }));
-    const { error } = await supabase.from('itinerary_items').upsert(updates);
-    if (error) throw error;
+  async reorderItems(dayId: string, itemIds: string[]) {
+    const res = await apiClient(`/api/operations/itineraries/days/${dayId}/reorder`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ item_ids: itemIds })
+    });
+    if (!res.ok) throw new Error('Failed to reorder items');
+  },
+
+  // PDF Generation
+  async generatePdf(itineraryId: string) {
+    const res = await apiClient(`/api/operations/itineraries/${itineraryId}/pdf`, {
+      method: 'POST'
+    });
+    if (!res.ok) throw new Error('Failed to generate PDF');
+    return await res.blob();
   }
 };

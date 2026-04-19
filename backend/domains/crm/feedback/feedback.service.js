@@ -1,5 +1,6 @@
 import { supabaseAdmin } from '../../../providers/database/supabase.js';
 import { softDeleteDirect } from '../../../core/utils/softDelete.js';
+import crypto from 'crypto';
 
 /**
  * FeedbackService — Post-Trip Relationship Governance
@@ -58,12 +59,29 @@ class FeedbackService {
         request_status: 'sent',
         requested_at: new Date().toISOString(),
         sent_at: new Date().toISOString(),
+        feedback_token: crypto.randomUUID(),
         created_by: userId
       })
       .select()
       .single();
 
     if (error) throw error;
+    return data;
+  }
+
+  /**
+   * Public-facing retrieval orchestrator
+   */
+  async getFeedbackByToken(token) {
+    const { data, error } = await supabaseAdmin
+      .from('post_trip_feedback')
+      .select('*, customer:customers(name)')
+      .eq('feedback_token', token)
+      .is('deleted_at', null)
+      .maybeSingle();
+
+    if (error) throw error;
+    if (!data) throw new Error('Feedback request not found');
     return data;
   }
 

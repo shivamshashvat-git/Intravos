@@ -33,20 +33,34 @@ class BookingService {
    * Create a new booking
    */
   async createBooking(tenantId, userId, payload) {
+    // userId is req.user.id (auth.uuid()). We must find public.users.id
+    const { data: userRecord } = await supabaseAdmin
+      .from('users')
+      .select('id')
+      .eq('auth_id', userId)
+      .single();
+
+    const actualUserId = userRecord?.id || userId;
     const booking_ref = `BK-${Date.now()}`;
+    
+    logger.info({ tenantId, userId, actualUserId, payload }, 'Attempting booking creation');
+
     const { data: booking, error } = await supabaseAdmin
       .from('bookings')
       .insert({
         ...payload,
         tenant_id: tenantId,
         booking_ref,
-        created_by: userId,
+        created_by: actualUserId,
         status: payload.status || 'confirmed'
       })
       .select()
       .single();
 
-    if (error) throw error;
+    if (error) {
+      logger.error({ error, detail: error.details }, 'Booking insertion failed');
+      throw error;
+    }
     return booking;
   }
 
@@ -91,12 +105,68 @@ class BookingService {
 
     if (error) throw error;
     
-    // Industrialized financial sync
     if (data.supplier_id) {
       await this.recalculateSupplierFinancials(tenantId, data.supplier_id);
     }
 
     return data;
+  }
+
+  /**
+   * Get all services for a specific booking
+   */
+  async getBookingServices(tenantId, bookingId) {
+    const { data, error } = await supabaseAdmin
+      .from('booking_services')
+      .select('*')
+      .eq('booking_id', bookingId)
+      .eq('tenant_id', tenantId)
+      .is('deleted_at', null)
+      .order('sort_order', { ascending: true });
+
+    if (error) throw error;
+    return data || [];
+  }
+
+  /**
+   * Update a specific booking service
+   */
+  async updateService(tenantId, serviceId, updates) {
+    const { data, error } = await supabaseAdmin
+      .from('booking_services')
+      .update(updates)
+      .eq('id', serviceId)
+      .eq('tenant_id', tenantId)
+      .select()
+      .single();
+
+    if (error) throw error;
+
+    if (data.supplier_id) {
+      await this.recalculateSupplierFinancials(tenantId, data.supplier_id);
+    }
+
+    return data;
+  }
+
+  /**
+   * Delete a specific booking service
+   */
+  async deleteService(tenantId, serviceId) {
+    const { data: service } = await supabaseAdmin
+      .from('booking_services')
+      .select('supplier_id')
+      .eq('id', serviceId)
+      .eq('tenant_id', tenantId)
+      .single();
+
+    const res = await softDeleteDirect(supabaseAdmin, 'booking_services', serviceId, tenantId);
+
+    if (service?.supplier_id) {
+       await this.recalculateSupplierFinancials(tenantId, service.supplier_id);
+    }
+
+    return res;
   }
 
   /**
@@ -250,6 +320,19 @@ class BookingService {
     const { data, error } = await query;
     if (error) throw error;
     return data || [];
+  }
+
+  /**
+   * Soft-delete booking
+   */
+  async deleteBooking(tenantId, bookingId) {
+    return softDeleteDirect(supabaseAdmin, 'bookings', bookingId, tenantId);
+  }
+
+  async getBookingHubAnalytics(tenantId) {
+    const { data, error } = await supabaseAdmin.rpc('get_booking_hub_analytics', { p_tenant_id: tenantId });
+    if (error) throw error;
+    return data;
   }
 }
 

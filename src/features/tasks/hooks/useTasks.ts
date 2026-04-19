@@ -27,7 +27,7 @@ export function useTasks(initialFilters: TaskFilters = {}) {
       
       // Auto-flag overdue client-side
       const today = new Date().toISOString().split('T')[0];
-      const processed = data.map(t => {
+      const processed = data.map((t: TaskType) => {
         const isOverdue = t.due_date && t.due_date < today && !t.is_done && t.status !== 'cancelled';
         return isOverdue ? { ...t, is_overdue: true } : t;
       });

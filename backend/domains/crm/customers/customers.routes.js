@@ -1,69 +1,90 @@
 import customersController from './customers.controller.js';
-import { z } from 'zod';
-import { validate } from '../../../core/middleware/validate.js';
 import express from 'express';
-import { authenticate  } from '../../../core/middleware/auth.js';
+import { validate } from '../../../core/middleware/validate.js';
+import { authenticate } from '../../../core/middleware/auth.js';
 import { requireStaff, requireAdmin, requireWriteAccess } from '../../../core/middleware/rbac.js';
 import { requireFeature } from '../../../core/middleware/featureFlag.js';
-import { asyncHandler  } from '../../../core/middleware/errorHandler.js';
+import { asyncHandler } from '../../../core/middleware/errorHandler.js';
+import { 
+  customerCreateSchema, 
+  customerUpdateSchema, 
+  associatedTravelerSchema,
+  messageTemplateSchema,
+  feedbackRequestSchema,
+  feedbackSubmitSchema,
+  referralSchema 
+} from './customers.schema.js';
 
 const router = express.Router();
 
-// ── ZOD SCHEMAS ──
-const customerCreateSchema = z.object({
-  name: z.string().min(1, 'Name is required'),
-  phone: z.string().min(1, 'Phone is required'),
-  email: z.string().email().optional().or(z.literal('')),
-  address: z.string().optional(),
-  tags: z.array(z.string()).optional(),
-  notes: z.string().optional(),
-});
+// ── CUSTOMER ANALYTICS & DEDUP ──
 
-// ── CUSTOMER MERGE ──
-// POST /api/customers/merge/preview
-router.post('/merge/preview', authenticate, requireAdmin(), requireFeature('customers'), asyncHandler((req, res) => customersController.getMergePreview(req, res)));
+// GET /api/v1/crm/customers/duplicate-phones
+router.get('/duplicate-phones', authenticate, requireStaff(), requireFeature('customers'), asyncHandler((req, res, next) => customersController.getDuplicatePhones(req, res, next)));
 
-// POST /api/customers/merge
-router.post('/merge', authenticate, requireAdmin(), requireWriteAccess, requireFeature('customers'), asyncHandler((req, res) => customersController.mergeCustomers(req, res)));
+// GET /api/v1/crm/customers/engagement/birthdays
+router.get('/engagement/birthdays', authenticate, requireStaff(), requireFeature('customers'), asyncHandler((req, res, next) => customersController.getUpcomingBirthdays(req, res, next)));
 
-// GET /api/customers/merge/logs
-router.get('/merge/logs', authenticate, requireAdmin(), requireFeature('customers'), asyncHandler((req, res) => customersController.getMergeLogs(req, res)));
+// GET /api/v1/crm/customers/engagement/anniversaries
+router.get('/engagement/anniversaries', authenticate, requireStaff(), requireFeature('customers'), asyncHandler((req, res, next) => customersController.getUpcomingAnniversaries(req, res, next)));
+
+// GET /api/v1/crm/customers/engagement/dormant
+router.get('/engagement/dormant', authenticate, requireStaff(), requireFeature('customers'), asyncHandler((req, res, next) => customersController.getDormantCustomers(req, res, next)));
 
 // ── CORE CRM ──
 
-// GET /api/customers
-router.get('/', authenticate, requireStaff(), requireFeature('customers'), asyncHandler((req, res) => customersController.listCustomers(req, res)));
+// GET /api/v1/crm/customers
+router.get('/', authenticate, requireStaff(), requireFeature('customers'), asyncHandler((req, res, next) => customersController.listCustomers(req, res, next)));
 
-// GET /api/customers/:id
-router.get('/:id', authenticate, requireStaff(), requireFeature('customers'), asyncHandler((req, res) => customersController.getCustomerById(req, res)));
+// POST /api/v1/crm/customers
+router.post('/', authenticate, requireStaff(), requireWriteAccess, requireFeature('customers'), validate(customerCreateSchema), asyncHandler((req, res, next) => customersController.createCustomer(req, res, next)));
 
-// POST /api/customers
-router.post('/', authenticate, requireStaff(), requireWriteAccess, requireFeature('customers'), validate(customerCreateSchema), asyncHandler((req, res) => customersController.createCustomer(req, res)));
+// GET /api/v1/crm/customers/:id
+router.get('/:id', authenticate, requireStaff(), requireFeature('customers'), asyncHandler((req, res, next) => customersController.getCustomerById(req, res, next)));
 
-// PATCH /api/customers/:id
-router.patch('/:id', authenticate, requireStaff(), requireWriteAccess, requireFeature('customers'), asyncHandler((req, res) => customersController.updateCustomer(req, res)));
+// PATCH /api/v1/crm/customers/:id
+router.patch('/:id', authenticate, requireStaff(), requireWriteAccess, requireFeature('customers'), validate(customerUpdateSchema), asyncHandler((req, res, next) => customersController.updateCustomer(req, res, next)));
 
-// DELETE /api/customers/:id
-router.delete('/:id', authenticate, requireAdmin(), requireWriteAccess, requireFeature('customers'), asyncHandler((req, res) => customersController.deleteCustomer(req, res)));
-
-// ── PRIVACY (GDPR) ──
-// POST /api/customers/:id/privacy/revoke
-router.post('/:id/privacy/revoke', authenticate, requireAdmin(), requireWriteAccess, requireFeature('customers'), asyncHandler((req, res, next) => customersController.revokePrivacyConsent(req, res, next)));
+// DELETE /api/v1/crm/customers/:id
+router.delete('/:id', authenticate, requireAdmin(), requireWriteAccess, requireFeature('customers'), asyncHandler((req, res, next) => customersController.deleteCustomer(req, res, next)));
 
 // ── TRAVELERS ──
-// POST /api/customers/:id/travelers
-router.post('/:id/travelers', authenticate, requireStaff(), requireWriteAccess, requireFeature('customers'), asyncHandler((req, res) => customersController.addTraveler(req, res)));
+// GET /api/v1/crm/customers/:id/travelers
+router.get('/:id/travelers', authenticate, requireStaff(), requireFeature('customers'), asyncHandler((req, res, next) => customersController.getTravelers(req, res, next)));
 
-// GET /api/customers/:id/travelers
-router.get('/:id/travelers', authenticate, requireStaff(), requireFeature('customers'), asyncHandler((req, res) => customersController.getTravelers(req, res)));
+// POST /api/v1/crm/customers/:id/travelers
+router.post('/:id/travelers', authenticate, requireStaff(), requireWriteAccess, requireFeature('customers'), validate(associatedTravelerSchema), asyncHandler((req, res, next) => customersController.addTraveler(req, res, next)));
 
-// ── RELATIONS & TIMELINE ──
+// ── MESSAGE TEMPLATES ──
+// GET /api/v1/crm/message-templates
+router.get('/config/templates', authenticate, requireStaff(), requireFeature('customers'), asyncHandler((req, res, next) => customersController.listMessageTemplates(req, res, next)));
 
-router.get('/:id/timeline', authenticate, requireStaff(), requireFeature('customers'), asyncHandler((req, res) => customersController.getCustomerTimeline(req, res)));
-router.get('/:id/bookings', authenticate, requireStaff(), requireFeature('customers'), asyncHandler((req, res) => customersController.getCustomerBookings(req, res)));
-router.get('/:id/quotations', authenticate, requireStaff(), requireFeature('customers'), asyncHandler((req, res) => customersController.getCustomerQuotations(req, res)));
-router.get('/:id/invoices', authenticate, requireStaff(), requireFeature('customers'), asyncHandler((req, res) => customersController.getCustomerInvoices(req, res)));
-router.get('/:id/visas', authenticate, requireStaff(), requireFeature('customers'), asyncHandler((req, res) => customersController.getCustomerVisas(req, res)));
-router.get('/:id/documents', authenticate, requireStaff(), requireFeature('customers'), asyncHandler((req, res) => customersController.getCustomerDocuments(req, res)));
+// POST /api/v1/crm/message-templates
+router.post('/config/templates', authenticate, requireStaff(), requireWriteAccess, requireFeature('customers'), validate(messageTemplateSchema), asyncHandler((req, res, next) => customersController.createMessageTemplate(req, res, next)));
+
+// PATCH /api/v1/crm/message-templates/:id
+router.patch('/config/templates/:id', authenticate, requireStaff(), requireWriteAccess, requireFeature('customers'), validate(messageTemplateSchema.partial()), asyncHandler((req, res, next) => customersController.updateMessageTemplate(req, res, next)));
+
+// DELETE /api/v1/crm/message-templates/:id
+router.delete('/config/templates/:id', authenticate, requireStaff(), requireWriteAccess, requireFeature('customers'), asyncHandler((req, res, next) => customersController.deleteMessageTemplate(req, res, next)));
+
+// ── FEEDBACK & REFERRALS ──
+
+// POST /api/v1/crm/feedback (Initiate request)
+router.post('/feedback/request', authenticate, requireStaff(), requireWriteAccess, requireFeature('customers'), validate(feedbackRequestSchema), asyncHandler((req, res, next) => customersController.requestFeedback(req, res, next)));
+
+// GET /api/v1/crm/referrals
+router.get('/referrals/all', authenticate, requireStaff(), requireFeature('customers'), asyncHandler((req, res, next) => customersController.listReferrals(req, res, next)));
+
+// POST /api/v1/crm/referrals
+router.post('/referrals', authenticate, requireStaff(), requireWriteAccess, requireFeature('customers'), validate(referralSchema), asyncHandler((req, res, next) => customersController.createReferral(req, res, next)));
+
+// PATCH /api/v1/crm/referrals/:id
+router.patch('/referrals/:id', authenticate, requireStaff(), requireWriteAccess, requireFeature('customers'), validate(referralSchema.partial()), asyncHandler((req, res, next) => customersController.updateReferral(req, res, next)));
+
+// ── RELATIONS ──
+router.get('/:id/bookings', authenticate, requireStaff(), requireFeature('customers'), asyncHandler((req, res, next) => customersController.getCustomerBookings(req, res, next)));
+router.get('/:id/quotations', authenticate, requireStaff(), requireFeature('customers'), asyncHandler((req, res, next) => customersController.getCustomerQuotations(req, res, next)));
+router.get('/:id/invoices', authenticate, requireStaff(), requireFeature('customers'), asyncHandler((req, res, next) => customersController.getCustomerInvoices(req, res, next)));
 
 export default router;

@@ -1,54 +1,26 @@
 import expensesController from './expenses.controller.js';
 import express from 'express';
-import { supabaseAdmin  } from '../../../providers/database/supabase.js';
-import { authenticate  } from '../../../core/middleware/auth.js';
+import { authenticate } from '../../../core/middleware/auth.js';
 import { requireStaff, requireAdmin, requireWriteAccess } from '../../../core/middleware/rbac.js';
 import { requireFeature } from '../../../core/middleware/featureFlag.js';
-
-import { asyncHandler  } from '../../../core/middleware/errorHandler.js';
-import { softDeleteDirect  } from '../../../core/utils/softDelete.js';
+import { asyncHandler } from '../../../core/middleware/errorHandler.js';
 
 const router = express.Router();
 
-function toAmount(value) {
-  const parsed = parseFloat(value);
-  return Number.isFinite(parsed) ? parsed : 0;
-}
+router.get('/categories', authenticate, requireStaff(), requireFeature('expenses'), asyncHandler((req, res, next) => expensesController.listCategories(req, res, next)));
 
-async function updateAccountBalance(tenantId, accountId, delta) {
-  if (!accountId || !delta) return;
+router.post('/categories', authenticate, requireAdmin(), requireWriteAccess, requireFeature('expenses'), asyncHandler((req, res, next) => expensesController.createCategory(req, res, next)));
 
-  const { data: account } = await supabaseAdmin
-    .from('bank_accounts')
-    .select('id, running_balance')
-    .eq('id', accountId)
-    .eq('tenant_id', tenantId)
-    .is('deleted_at', null)
-    .single();
+router.patch('/categories/:id', authenticate, requireAdmin(), requireWriteAccess, requireFeature('expenses'), asyncHandler((req, res, next) => expensesController.updateCategory(req, res, next)));
 
-  if (!account) return;
+router.delete('/categories/:id', authenticate, requireAdmin(), requireWriteAccess, requireFeature('expenses'), asyncHandler((req, res, next) => expensesController.deleteCategory(req, res, next)));
 
-  await supabaseAdmin
-    .from('bank_accounts')
-    .update({ running_balance: toAmount(account.running_balance) + delta })
-    .eq('id', accountId)
-    .eq('tenant_id', tenantId);
-}
+router.get('/', authenticate, requireStaff(), requireFeature('expenses'), asyncHandler((req, res, next) => expensesController.listExpenses(req, res, next)));
 
-router.get('/categories', authenticate, requireStaff(), requireFeature('expenses'), asyncHandler((req, res, next) => expensesController.get_categories_0(req, res, next)));;
+router.post('/', authenticate, requireStaff(), requireWriteAccess, requireFeature('expenses'), asyncHandler((req, res, next) => expensesController.recordExpense(req, res, next)));
 
-router.post('/categories', authenticate, requireAdmin(), requireWriteAccess, requireFeature('expenses'), asyncHandler((req, res, next) => expensesController.post_categories_1(req, res, next)));;
+router.patch('/:id', authenticate, requireStaff(), requireWriteAccess, requireFeature('expenses'), asyncHandler((req, res, next) => expensesController.updateExpense(req, res, next)));
 
-router.patch('/categories/:id', authenticate, requireAdmin(), requireWriteAccess, requireFeature('expenses'), asyncHandler((req, res, next) => expensesController.patch_categories__id_2(req, res, next)));;
-
-router.delete('/categories/:id', authenticate, requireAdmin(), requireWriteAccess, requireFeature('expenses'), asyncHandler((req, res, next) => expensesController.delete_categories__id_3(req, res, next)));;
-
-router.get('/', authenticate, requireStaff(), requireFeature('expenses'), asyncHandler((req, res, next) => expensesController.get__4(req, res, next)));;
-
-router.post('/', authenticate, requireStaff(), requireWriteAccess, requireFeature('expenses'), asyncHandler((req, res, next) => expensesController.post__5(req, res, next)));;
-
-router.patch('/:id', authenticate, requireStaff(), requireWriteAccess, requireFeature('expenses'), asyncHandler((req, res, next) => expensesController.patch_id_6(req, res, next)));;
-
-router.delete('/:id', authenticate, requireStaff(), requireWriteAccess, requireFeature('expenses'), asyncHandler((req, res, next) => expensesController.delete_id_7(req, res, next)));;
+router.delete('/:id', authenticate, requireStaff(), requireWriteAccess, requireFeature('expenses'), asyncHandler((req, res, next) => expensesController.deleteExpense(req, res, next)));
 
 export default router;

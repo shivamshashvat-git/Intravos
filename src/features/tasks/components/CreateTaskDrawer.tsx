@@ -1,8 +1,10 @@
 import React, { useState, useEffect } from 'react';
 import { X, CheckSquare, User, Flag, Calendar, Link as LinkIcon, Search, Briefcase, Hash } from 'lucide-react';
 import { tasksService } from '@/features/tasks/services/tasksService';
+import { usersService } from '@/features/system/services/usersService';
+import { leadsService } from '@/features/crm/services/leadsService';
+import { bookingsService } from '@/features/operations/services/bookingsService';
 import { useAuth } from '@/core/hooks/useAuth';
-import { supabase } from '@/core/lib/supabase';
 import { clsx } from 'clsx';
 import { toast } from 'sonner';
 import { TaskType, TaskPriority, TaskStatus } from '../types/task';
@@ -39,7 +41,7 @@ export const CreateTaskDrawer: React.FC<CreateTaskDrawerProps> = ({ isOpen, onCl
 
   useEffect(() => {
     if (tenant?.id) {
-       supabase.from('users').select('id, name').eq('tenant_id', tenant.id).eq('is_active', true).then(({ data }) => setUsers(data || []));
+       usersService.listUsers().then(data => setUsers(data || []));
     }
   }, [tenant?.id]);
 
@@ -64,15 +66,25 @@ export const CreateTaskDrawer: React.FC<CreateTaskDrawerProps> = ({ isOpen, onCl
   const handleLeadSearch = async (val: string) => {
     setSearchLead(val);
     if (val.length < 2) { setLeadResults([]); return; }
-    const { data } = await supabase.from('leads').select('id, customer_name, destination').ilike('customer_name', `%${val}%`).limit(5);
-    setLeadResults(data || []);
+    try {
+      if (!tenant?.id) return;
+      const { data } = await leadsService.getLeads(tenant.id, { search: val });
+      setLeadResults(data || []);
+    } catch (e) {
+      console.error(e);
+    }
   };
 
   const handleBookingSearch = async (val: string) => {
     setSearchBooking(val);
     if (val.length < 2) { setBookingResults([]); return; }
-    const { data } = await supabase.from('bookings').select('id, booking_number, title').ilike('booking_number', `%${val}%`).limit(5);
-    setBookingResults(data || []);
+    try {
+      if (!tenant?.id) return;
+      const data = await bookingsService.getBookings(tenant.id, { search: val });
+      setBookingResults(data || []);
+    } catch (e) {
+      console.error(e);
+    }
   };
 
   const handleSubmit = async (e: React.FormEvent) => {

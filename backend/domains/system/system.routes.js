@@ -13,6 +13,7 @@ import uploadsRoutes from './uploads/uploads.routes.js';
 import masterassetsRoutes from './master-assets/master_assets.routes.js';
 import workspaceRoutes from './workspace/workspace.routes.js';
 import importRoutes from './import/import.routes.js';
+import dashboardRoutes from './dashboard/dashboard.routes.js';
 
 const router = Router();
 
@@ -29,5 +30,6 @@ router.use('/uploads', uploadsRoutes);
 router.use('/master-assets', masterassetsRoutes);
 router.use('/workspace', workspaceRoutes);
 router.use('/import', importRoutes);
+router.use('/dashboard', dashboardRoutes);
 
 export default router;

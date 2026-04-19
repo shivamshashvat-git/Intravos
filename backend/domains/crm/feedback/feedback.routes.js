@@ -10,12 +10,15 @@ import { softDeleteDirect  } from '../../../core/utils/softDelete.js';
 
 const router = express.Router();
 
-router.get('/', authenticate, requireStaff(), requireFeature('feedback'), asyncHandler((req, res, next) => feedbackController.get__0(req, res, next)));;
+router.get('/:token', asyncHandler((req, res, next) => feedbackController.getFeedbackByToken(req, res, next)));
 
-router.post('/request', authenticate, requireStaff(), requireWriteAccess, requireFeature('feedback'), asyncHandler((req, res, next) => feedbackController.post_request_1(req, res, next)));;
+router.patch('/:token', asyncHandler((req, res, next) => feedbackController.submitFeedback(req, res, next)));
 
-router.post('/public/:token', asyncHandler((req, res, next) => feedbackController.post_public__token_2(req, res, next)));;
+// ── PROTECTED ENDPOINTS ──
+router.get('/', authenticate, requireStaff(), requireFeature('feedback'), asyncHandler((req, res, next) => feedbackController.listFeedback(req, res, next)));
 
-router.delete('/:id', authenticate, requireStaff(), requireWriteAccess, requireFeature('feedback'), asyncHandler((req, res, next) => feedbackController.delete_id_3(req, res, next)));;
+router.post('/request', authenticate, requireStaff(), requireWriteAccess, requireFeature('feedback'), asyncHandler((req, res, next) => feedbackController.requestFeedback(req, res, next)));
+
+router.delete('/:id', authenticate, requireStaff(), requireWriteAccess, requireFeature('feedback'), asyncHandler((req, res, next) => feedbackController.deleteFeedback(req, res, next)));
 
 export default router;

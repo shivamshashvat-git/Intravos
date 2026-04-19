@@ -45,38 +45,58 @@ class CancellationService {
    * Process a new cancellation (Atomic Booking update)
    */
   async createCancellation(tenantId, userId, payload) {
-    const { booking_id } = payload;
+    const { booking_id, cancellation_reason, charge_amount, refund_amount, ...rest } = payload;
     if (!booking_id) throw new Error('booking_id is required');
 
-    const originalAmount = Number(payload.original_amount) || 0;
-    const cancellationCharge = Number(payload.cancellation_charge) || 0;
-    const refundableAmount = Math.max(0, originalAmount - cancellationCharge);
+    // Industrial ID Resolution
+    const { data: userRec } = await supabaseAdmin.from('users').select('id').eq('auth_id', userId).single();
+    const actualUserId = userRec?.id || userId;
+
+    const cancellationCharge = Number(charge_amount || rest.cancellation_charge) || 0;
     
+    // Industrial Mapping: Strip fields not in Table
+    const dbPayload = {
+      tenant_id: tenantId,
+      booking_id,
+      reason: cancellation_reason || rest.reason,
+      cancellation_charge: cancellationCharge,
+      refund_amount_client: refund_amount || rest.refund_amount_client || 0,
+      cancelled_by: actualUserId
+    };
+
     const { data: cancellation, error } = await supabaseAdmin
       .from('cancellations')
-      .insert({
-        ...payload,
-        tenant_id: tenantId,
-        original_amount: originalAmount,
-        cancellation_charge: cancellationCharge,
-        refundable_amount: refundableAmount,
-        status: payload.status || 'pending',
-        requested_at: new Date().toISOString()
-      })
+      .insert(dbPayload)
       .select()
       .single();
 
     if (error) throw error;
+    
+    // Fetch old booking for audit
+    const { data: oldBooking } = await supabaseAdmin.from('bookings').select('*').eq('id', booking_id).single();
 
-    // Orchestration: Update Booking state and financials
-    await supabaseAdmin
+    // Orchestration: Update Booking state
+    const { data: newBooking } = await supabaseAdmin
       .from('bookings')
-      .update({
-        status: 'cancelled',
-        total_selling_price: cancellationCharge // Booking value is now effectively just the charge
-      })
+      .update({ status: 'cancelled' })
       .eq('id', booking_id)
-      .eq('tenant_id', tenantId);
+      .eq('tenant_id', tenantId)
+      .select()
+      .single();
+
+    // Industrial Audit: Record status mutation to 'cancelled'
+    await supabaseAdmin.from('financial_audit_log').insert({
+      tenant_id: tenantId,
+      entity_type: 'booking',
+      entity_id: booking_id,
+      field_changed: 'status',
+      old_value: oldBooking.status,
+      new_value: 'cancelled',
+      snapshot_before: oldBooking,
+      snapshot_after: newBooking,
+      changed_at: new Date().toISOString(),
+      user_id: actualUserId
+    }).throwOnError();
 
     return cancellation;
   }
@@ -130,6 +150,26 @@ class CancellationService {
    */
   async deleteCancellation(tenantId, userId, cancellationId) {
     return await softDeleteDirect(supabaseAdmin, 'cancellations', cancellationId, tenantId);
+  }
+
+  async _auditMutation(tenantId, userId, entityType, entityId, oldSnapshot, newSnapshot) {
+    const priceFields = ['refundable_amount', 'cancellation_charge', 'vendor_refund_received'];
+    for (const field of priceFields) {
+      if (newSnapshot[field] !== undefined && parseFloat(newSnapshot[field] || 0) !== parseFloat(oldSnapshot[field] || 0)) {
+        await supabaseAdmin.from('financial_audit_log').insert({
+          tenant_id: tenantId,
+          entity_type: entityType,
+          entity_id: entityId,
+          field_changed: field,
+          old_value: oldSnapshot[field] || 0,
+          new_value: newSnapshot[field],
+          snapshot_before: oldSnapshot,
+          snapshot_after: newSnapshot,
+          changed_at: new Date().toISOString(),
+          user_id: userId
+        }).throwOnError();
+      }
+    }
   }
 }
 

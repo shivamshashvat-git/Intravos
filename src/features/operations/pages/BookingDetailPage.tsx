@@ -5,8 +5,8 @@ import {
   MapPin, Calendar, Users, Briefcase, FileText, 
   Plus, MoreVertical, Flag, ShieldCheck, Plane, 
   Building2, Car, Activity, Target, Shield, 
-  PhoneCall, Download, Hash, Clipboard, User,
-  Navigation, Globe, ExternalLink, ArrowRight, ChevronRight
+  Navigation, Globe, ExternalLink, ArrowRight, ChevronRight, AlertCircle,
+  Clipboard as ClipboardIcon, Download, Hash, PhoneCall
 } from 'lucide-react';
 import { useBookingDetail } from '../hooks/useBookingDetail';
 import { useAuth } from '@/core/hooks/useAuth';
@@ -24,7 +24,7 @@ export const BookingDetailPage: React.FC = () => {
   const { id } = useParams();
   const navigate = useNavigate();
   const { user, tenant } = useAuth();
-  const isAdmin = user?.role === 'admin' || user?.role === 'super_admin';
+  const isAdmin = ['admin', 'agency_admin', 'super_admin'].includes(user?.role || '');
   const { 
     booking, isLoading, updateStatus, addService, 
     deleteService, addMember, deleteMember, updateBookingValue 
@@ -304,7 +304,7 @@ export const BookingDetailPage: React.FC = () => {
               <div className="col-span-12 lg:col-span-4 space-y-12">
                  <div className="bg-white rounded-[3rem] border border-slate-200 p-10 shadow-xl space-y-10">
                     <h3 className="text-[11px] font-black uppercase text-slate-400 tracking-[0.2em] flex items-center gap-3 italic">
-                       <Clipboard className="w-4 h-4 text-emerald-500" /> Operational Overlays
+                       <ClipboardIcon className="w-4 h-4 text-emerald-500" /> Operational Overlays
                     </h3>
                     
                     <div className="space-y-8">
@@ -495,7 +495,7 @@ const PNRField = ({ label, value }: { label: string, value?: string }) => (
   <div className="space-y-2 group">
      <div className="flex justify-between items-center px-1">
         <label className="text-[8px] font-black text-slate-300 uppercase tracking-widest italic">{label}</label>
-        <button onClick={() => { navigator.clipboard.writeText(value || ''); toast.success('Key Captured to Clipboard'); }} className="opacity-0 group-hover:opacity-100 transition-all"><Clipboard className="w-3.5 h-3.5 text-indigo-400" /></button>
+        <button onClick={() => { navigator.clipboard.writeText(value || ''); toast.success('Key Captured to Clipboard'); }} className="opacity-0 group-hover:opacity-100 transition-all"><ClipboardIcon className="w-3.5 h-3.5 text-indigo-400" /></button>
      </div>
      <div className="p-4 bg-slate-50 border border-slate-100 rounded-2xl flex items-center justify-between shadow-sm">
         <span className={clsx("text-xs font-mono font-black italic", value ? "text-indigo-600" : "text-slate-300")}>{value || 'UNMAPPED_NODE'}</span>
@@ -637,6 +637,6 @@ const MemberForm = ({ onClose, onSubmit }: any) => {
   );
 };
 
-const IndianRupee = (props: any) => <Clipboard {...props} />;
+const IndianRupee = (props: any) => <ClipboardIcon {...props} />;
 const MapIcon = (props: any) => <MapPin {...props} />;
 const ActivityIcon = (props: any) => <Activity {...props} />;

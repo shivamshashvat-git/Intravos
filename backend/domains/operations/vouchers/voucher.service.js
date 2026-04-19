@@ -1,118 +1,94 @@
+
 import { supabaseAdmin } from '../../../providers/database/supabase.js';
+import { generatePdf, fetchTenantBranding } from '../../../providers/pdf-engine/pdfEngine.js';
+import { softDeleteDirect } from '../../../core/utils/softDelete.js';
 
-/**
- * VoucherService — Service Voucher & Vendor Fulfillment Orchestration
- */
 class VoucherService {
-  /**
-   * Fetch rich voucher details with relations
-   */
-  async getById(tenantId, voucherId) {
-    const { data, error } = await supabaseAdmin
+  async listVouchers(tenantId, filters = {}) {
+    const { booking_id, status } = filters;
+    let query = supabaseAdmin
       .from('vouchers')
-      .select(`
-        *,
-        bookings(
-          booking_ref, 
-          destination, 
-          travel_start_date, 
-          travel_end_date, 
-          customer_id, 
-          customers(name, phone, email)
-        )
-      `)
-      .eq('id', voucherId)
+      .select('*')
       .eq('tenant_id', tenantId)
       .is('deleted_at', null)
-      .maybeSingle();
+      .order('created_at', { ascending: false });
 
+    if (booking_id) query = query.eq('booking_id', booking_id);
+    if (status) query = query.eq('status', status);
+
+    const { data, error } = await query;
     if (error) throw error;
-    return data;
+    return data || [];
   }
 
-  /**
-   * Transition Booking Service to Vouchered state
-   */
-  async generateVoucher(tenantId, userId, payload) {
-    if (!payload.booking_service_id) throw new Error('booking_service_id is required');
+  async createVoucher(tenantId, userId, payload) {
+    const { 
+      voucher_number, 
+      service_id, 
+      confirmation_number,
+      valid_from,
+      valid_to,
+      ...rest 
+    } = payload;
+    
+    // Industrial ID Resolution
+    const { data: userRec } = await supabaseAdmin.from('users').select('id').eq('auth_id', userId).single();
+    const actualUserId = userRec?.id || userId;
 
-    // 1. Fetch source service & booking
-    const { data: service } = await supabaseAdmin
-      .from('booking_services')
-      .select('*')
-      .eq('id', payload.booking_service_id)
-      .eq('tenant_id', tenantId)
-      .single();
+    // Industrial Mapping for DB consistency (vouchers table)
+    const dbPayload = {
+      tenant_id: tenantId,
+      created_by: actualUserId,
+      booking_id: payload.booking_id,
+      booking_service_id: service_id || payload.booking_service_id,
+      voucher_num: voucher_number || payload.voucher_num,
+      booking_reference: confirmation_number || payload.booking_reference,
+      travel_dates: (valid_from && valid_to) ? `${valid_from} - ${valid_to}` : payload.travel_dates,
+      guest_names: payload.guest_names,
+      room_type: payload.room_type,
+      meal_plan: payload.meal_plan,
+      special_requests: payload.special_requests
+    };
 
-    if (!service) throw new Error('Booking service not found');
-
-    const { data: booking } = await supabaseAdmin
-      .from('bookings')
-      .select('*')
-      .eq('id', service.booking_id)
-      .eq('tenant_id', tenantId)
-      .single();
-
-    if (!booking) throw new Error('Booking not found');
-
-    // 2. Prepare fulfillment metadata
-    const guestNames = payload.guest_names || payload.guest_name || 'Guest';
-    const travelDates = payload.travel_dates || `${service.service_start_date || booking.travel_start_date || ''} to ${service.service_end_date || booking.travel_end_date || ''}`;
-
-    // 3. Create Voucher Record
-    const { data: voucher, error: vError } = await supabaseAdmin
-      .from('vouchers')
-      .insert({
-        tenant_id: tenantId,
-        booking_id: booking.id,
-        booking_service_id: service.id,
-        supplier_id: payload.supplier_id || service.supplier_id || null,
-        guest_names: guestNames,
-        travel_dates: travelDates,
-        room_type: payload.room_type || service.room_type || null,
-        meal_plan: payload.meal_plan || service.meal_plan || null,
-        special_requests: payload.special_requests || service.special_requests || null,
-        booking_reference: payload.booking_reference || service.confirmation_number || booking.booking_ref,
-        agency_contact: payload.agency_contact || null,
-        created_by: userId
-      })
-      .select()
-      .single();
-
-    if (vError) throw vError;
-
-    // 4. Update Service State (Atomic side-effect)
-    await supabaseAdmin
-      .from('booking_services')
-      .update({ 
-        voucher_generated: true, 
-        voucher_generated_at: new Date().toISOString() 
-      })
-      .eq('id', service.id)
-      .eq('tenant_id', tenantId);
-
-    return voucher;
-  }
-
-  /**
-   * Finalize vendor dispatch
-   */
-  async markSent(tenantId, voucherId) {
     const { data, error } = await supabaseAdmin
       .from('vouchers')
-      .update({
-        sent_to_supplier: true,
-        sent_at: new Date().toISOString(),
-        updated_at: new Date().toISOString()
-      })
-      .eq('id', voucherId)
-      .eq('tenant_id', tenantId)
-      .is('deleted_at', null)
+      .insert(dbPayload)
       .select()
       .single();
 
     if (error) throw error;
     return data;
+  }
+
+  async updateVoucher(tenantId, id, updates) {
+    const { data, error } = await supabaseAdmin
+      .from('vouchers')
+      .update({ ...updates, updated_at: new Date().toISOString() })
+      .eq('id', id)
+      .eq('tenant_id', tenantId)
+      .select()
+      .single();
+
+    if (error) throw error;
+    return data;
+  }
+
+  async deleteVoucher(tenantId, id) {
+    return await softDeleteDirect(supabaseAdmin, 'vouchers', id, tenantId);
+  }
+
+  async generatePdf(tenantId, id) {
+    const { data: voucher, error } = await supabaseAdmin
+      .from('vouchers')
+      .select('*, bookings(*, customers(*))')
+      .eq('id', id)
+      .eq('tenant_id', tenantId)
+      .single();
+
+    if (error || !voucher) throw new Error('Voucher not found');
+
+    const branding = await fetchTenantBranding(supabaseAdmin, tenantId);
+    return generatePdf('voucher', voucher, branding);
   }
 }
 

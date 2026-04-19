@@ -1,96 +1,120 @@
-import { supabase } from '@/core/lib/supabase';
+import { apiClient } from '@/core/lib/apiClient';
 import { TenantSettings, TeamMember, BankAccount } from '@/features/settings/types/settings';
+
+const API_BASE = import.meta.env.VITE_API_URL || '';
 
 export const settingsService = {
   async getTenant(tenantId: string) {
-    const { data, error } = await supabase.from('tenants').select('*').eq('id', tenantId).single();
-    if (error) throw error;
-    return data as TenantSettings;
+    const res = await apiClient(`${API_BASE}/api/v1/settings`);
+    if (!res.ok) throw new Error('Failed to fetch tenant configuration');
+    const result = await res.json();
+    return result.data as TenantSettings;
   },
 
   async updateTenant(tenantId: string, updates: Partial<TenantSettings>) {
-    const { error } = await supabase.from('tenants').update(updates).eq('id', tenantId);
-    if (error) throw error;
+    const res = await apiClient(`${API_BASE}/api/v1/settings`, {
+      method: 'PATCH',
+      body: JSON.stringify(updates)
+    });
+    if (!res.ok) throw new Error('Failed to update tenant configuration');
   },
 
   async uploadLogo(tenantId: string, file: File) {
-    const ext = file.name.split('.').pop();
-    const path = `${tenantId}/logo_${Date.now()}.${ext}`;
-    
-    const { error: uploadError } = await supabase.storage
-      .from('tenant-logos')
-      .upload(path, file);
-    if (uploadError) throw uploadError;
+    const formData = new FormData();
+    formData.append('file', file);
+    formData.append('bucket', 'tenant-logos');
 
-    const { data: { publicUrl } } = supabase.storage.from('tenant-logos').getPublicUrl(path);
+    const res = await apiClient(`${API_BASE}/api/v1/system/uploads`, {
+      method: 'POST',
+      body: formData
+    });
+    if (!res.ok) throw new Error('Failed to upload logo');
+    const result = await res.json();
+    
+    const publicUrl = result.data?.signed_url;
     await this.updateTenant(tenantId, { logo_url: publicUrl });
     return publicUrl;
   },
 
+  async getPlatformSettings() {
+    const res = await apiClient(`${API_BASE}/api/v1/settings/platform`);
+    if (!res.ok) throw new Error('Failed to fetch platform overrides');
+    const result = await res.json();
+    return result.data;
+  },
+
+  async updatePlatformSettings(data: any) {
+    const res = await apiClient(`${API_BASE}/api/v1/settings/platform`, {
+      method: 'PATCH',
+      body: JSON.stringify(data)
+    });
+    if (!res.ok) throw new Error('Failed to update platform overrides');
+  },
+
   async getTeamMembers(tenantId: string) {
-    const { data, error } = await supabase
-      .from('users')
-      .select('*')
-      .eq('tenant_id', tenantId)
-      .is('deleted_at', null)
-      .order('role', { ascending: true });
-    if (error) throw error;
-    return data as TeamMember[];
+    const res = await apiClient(`${API_BASE}/api/v1/team`);
+    if (!res.ok) throw new Error('Failed to fetch team members');
+    const result = await res.json();
+    return result.data as TeamMember[];
   },
 
   async updateMember(id: string, updates: Partial<TeamMember>) {
-    const { error } = await supabase.from('users').update(updates).eq('id', id);
-    if (error) throw error;
+    const res = await apiClient(`${API_BASE}/api/v1/team/${id}`, {
+      method: 'PATCH',
+      body: JSON.stringify(updates)
+    });
+    if (!res.ok) throw new Error('Failed to update team member');
   },
 
   async inviteMember(tenantId: string, data: any) {
-    // Ideally use Admin API, but for many setups we just insert user record
-    const { error } = await supabase.from('users').insert({
-      tenant_id: tenantId,
-      email: data.email,
-      name: data.name,
-      role: data.role,
-      designation: data.designation,
-      is_active: true
+    const res = await apiClient(`${API_BASE}/api/v1/team/invite`, {
+      method: 'POST',
+      body: JSON.stringify(data)
     });
-    if (error) throw error;
+    if (!res.ok) throw new Error('Failed to invite member');
+  },
+
+  async deleteMember(id: string) {
+    const res = await apiClient(`${API_BASE}/api/v1/team/${id}`, {
+      method: 'DELETE'
+    });
+    if (!res.ok) throw new Error('Failed to deactivate member');
   },
 
   async getBankAccounts(tenantId: string) {
-    const { data, error } = await supabase
-      .from('bank_accounts')
-      .select('*')
-      .eq('tenant_id', tenantId)
-      .is('deleted_at', null)
-      .order('is_primary', { ascending: false });
-    if (error) throw error;
-    return data as BankAccount[];
+    const res = await apiClient(`${API_BASE}/api/v1/settings/bank-accounts`);
+    if (!res.ok) throw new Error('Failed to fetch bank accounts');
+    const result = await res.json();
+    return result.data as BankAccount[];
   },
 
   async createBankAccount(tenantId: string, data: Partial<BankAccount>) {
-    if (data.is_primary) {
-      await supabase.from('bank_accounts').update({ is_primary: false }).eq('tenant_id', tenantId);
-    }
-    const { error } = await supabase.from('bank_accounts').insert({ ...data, tenant_id: tenantId });
-    if (error) throw error;
+    const res = await apiClient(`${API_BASE}/api/v1/settings/bank-accounts`, {
+      method: 'POST',
+      body: JSON.stringify(data)
+    });
+    if (!res.ok) throw new Error('Failed to create bank account');
   },
 
   async updateBankAccount(id: string, updates: Partial<BankAccount>, tenantId: string) {
-    if (updates.is_primary) {
-      await supabase.from('bank_accounts').update({ is_primary: false }).eq('tenant_id', tenantId);
-    }
-    const { error } = await supabase.from('bank_accounts').update(updates).eq('id', id);
-    if (error) throw error;
+    const res = await apiClient(`${API_BASE}/api/v1/settings/bank-accounts/${id}`, {
+      method: 'PATCH',
+      body: JSON.stringify(updates)
+    });
+    if (!res.ok) throw new Error('Failed to update bank account');
   },
 
   async setPrimaryBankAccount(id: string, tenantId: string) {
-    await supabase.from('bank_accounts').update({ is_primary: false }).eq('tenant_id', tenantId);
-    const { error } = await supabase.from('bank_accounts').update({ is_primary: true }).eq('id', id);
-    if (error) throw error;
+    const res = await apiClient(`${API_BASE}/api/v1/settings/bank-accounts/${id}/primary`, {
+      method: 'PATCH'
+    });
+    if (!res.ok) throw new Error('Failed to set primary bank account');
   },
 
   async deleteBankAccount(id: string) {
-    const { error } = await supabase.from('bank_accounts').update({ deleted_at: new Date().toISOString(), is_primary: false }).eq('id', id);
-    if (error) throw error;
+    const res = await apiClient(`${API_BASE}/api/v1/settings/bank-accounts/${id}`, {
+      method: 'DELETE'
+    });
+    if (!res.ok) throw new Error('Failed to delete bank account');
   }
 };

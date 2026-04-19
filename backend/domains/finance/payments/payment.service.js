@@ -1,6 +1,8 @@
 import { supabaseAdmin } from '../../../providers/database/supabase.js';
 import { toAmount } from '../../../core/utils/helpers.js';
 import { pushPaymentReceived } from '../../../providers/communication/pushService.js';
+import invoiceService from '../invoices/invoice.service.js';
+import { softDeleteDirect } from '../../../core/utils/softDelete.js';
 
 /**
  * PaymentService — Multi-tenant Ledger & Financial Synchronization
@@ -15,12 +17,7 @@ class PaymentService {
 
     const direction = payload.direction || (payload.is_refund ? 'out' : 'in');
 
-    // 1. Integrity Check: Refund Loophole
-    if (direction === 'out') {
-      await this._validateRefund(tenantId, payload.invoice_id, payload.lead_id, amount);
-    }
-
-    // 2. Record Transaction
+    // 1. Record Transaction
     const { data: trx, error } = await supabaseAdmin
       .from('payment_transactions')
       .insert({
@@ -35,14 +32,16 @@ class PaymentService {
 
     if (error) throw error;
 
-    // 3. Chain Reaction: Update Ledgers
-    await Promise.all([
-      this._syncLeadCollected(tenantId, trx.lead_id, amount, direction),
-      this._syncInvoicePaid(tenantId, trx.invoice_id, amount, direction),
-      this._syncBankAccount(tenantId, trx.account_id, amount, direction),
-      this._checkMilestone(userId),
-      this._triggerNotification(tenantId, trx)
-    ]);
+    // 2. Chain Reaction: Centralized Financial Recalculation
+    const tasks = [];
+    if (trx.invoice_id) tasks.push(invoiceService.recalculate(tenantId, trx.invoice_id));
+    if (trx.lead_id) tasks.push(this._syncLeadCollected(tenantId, trx.lead_id));
+    if (trx.account_id) tasks.push(this._syncBankAccount(tenantId, trx.account_id, amount, direction));
+    
+    tasks.push(this._auditPayment(tenantId, userId, trx));
+    tasks.push(this._triggerNotification(tenantId, trx));
+
+    await Promise.allSettled(tasks);
 
     return trx;
   }
@@ -86,72 +85,76 @@ class PaymentService {
     if (error) throw error;
 
     // 3. Chain Reaction: Supplier Balances
-    await Promise.all([
+    await Promise.allSettled([
       this._syncSupplierService(tenantId, service, amount),
       this._syncSupplierDirectory(tenantId, vendorId, amount, service),
-      this._syncBankAccount(tenantId, trx.account_id, amount, 'out')
+      this._syncBankAccount(tenantId, trx.account_id, amount, 'out'),
+      this._auditPayment(tenantId, userId, trx)
     ]);
 
     return trx;
   }
 
+  /**
+   * Update payment record
+   */
+  async updatePayment(tenantId, userId, paymentId, payload) {
+    const oldSnapshot = await this.getReceiptData(tenantId, paymentId);
+    if (!oldSnapshot) throw new Error('Payment not found');
+
+    const { data: trx, error } = await supabaseAdmin
+      .from('payment_transactions')
+      .update({ ...payload, updated_at: new Date().toISOString() })
+      .eq('id', paymentId)
+      .eq('tenant_id', tenantId)
+      .select()
+      .single();
+
+    if (error) throw error;
+
+    // Re-trigger sync if amount or invoice/lead changed
+    if (trx.invoice_id) await invoiceService.recalculate(tenantId, trx.invoice_id);
+    if (oldSnapshot.invoice_id && oldSnapshot.invoice_id !== trx.invoice_id) {
+       await invoiceService.recalculate(tenantId, oldSnapshot.invoice_id);
+    }
+
+    return trx;
+  }
+
+  /**
+   * Delete payment
+   */
+  async deletePayment(tenantId, paymentId) {
+    const payment = await this.getReceiptData(tenantId, paymentId);
+    const result = await softDeleteDirect({ table: 'payment_transactions', id: paymentId, tenantId });
+    
+    if (payment?.invoice_id) {
+      await invoiceService.recalculate(tenantId, payment.invoice_id);
+    }
+    
+    return result;
+  }
+
   // --- INTERNAL SYNCHRONIZERS ---
 
-  async _validateRefund(tenantId, invoiceId, leadId, amount) {
-    if (invoiceId) {
-      const { data } = await supabaseAdmin
-        .from('invoices')
-        .select('amount_paid')
-        .eq('id', invoiceId)
-        .eq('tenant_id', tenantId)
-        .single();
-      if (data && amount > toAmount(data.amount_paid)) throw new Error('Refund exceeds invoice paid amount');
-    } else if (leadId) {
-      const { data } = await supabaseAdmin
-        .from('leads')
-        .select('amount_collected')
-        .eq('id', leadId)
-        .eq('tenant_id', tenantId)
-        .single();
-      if (data && amount > toAmount(data.amount_collected)) throw new Error('Refund exceeds lead collected amount');
-    }
-  }
-
-  async _syncLeadCollected(tenantId, leadId, amount, direction) {
+  async _syncLeadCollected(tenantId, leadId) {
     if (!leadId) return;
-    const { data: lead } = await supabaseAdmin
-      .from('leads')
-      .select('amount_collected')
-      .eq('id', leadId)
+    
+    const { data: payments } = await supabaseAdmin
+      .from('payment_transactions')
+      .select('amount, direction')
+      .eq('lead_id', leadId)
       .eq('tenant_id', tenantId)
-      .single();
-    if (!lead) return;
-    const delta = direction === 'out' ? -amount : amount;
-    await supabaseAdmin
-      .from('leads')
-      .update({ amount_collected: Math.max(0, toAmount(lead.amount_collected) + delta) })
-      .eq('id', leadId)
-      .eq('tenant_id', tenantId);
-  }
+      .is('deleted_at', null);
 
-  async _syncInvoicePaid(tenantId, invoiceId, amount, direction) {
-    if (!invoiceId) return;
-    const { data: inv } = await supabaseAdmin
-      .from('invoices')
-      .select('id, total, amount_paid, status')
-      .eq('id', invoiceId)
-      .eq('tenant_id', tenantId)
-      .single();
-    if (!inv) return;
-    const delta = direction === 'out' ? -amount : amount;
-    const newPaid = Math.max(0, toAmount(inv.amount_paid) + delta);
+    const totalCollected = (payments || []).reduce((sum, p) => {
+      return p.direction === 'in' ? sum + parseFloat(p.amount) : sum - parseFloat(p.amount);
+    }, 0);
+
     await supabaseAdmin
-      .from('invoices')
-      .update({ 
-        amount_paid: newPaid,
-        status: this._nextInvoiceStatus(inv, newPaid)
-      })
-      .eq('id', invoiceId)
+      .from('leads')
+      .update({ amount_collected: Math.max(0, totalCollected) })
+      .eq('id', leadId)
       .eq('tenant_id', tenantId);
   }
 
@@ -174,12 +177,21 @@ class PaymentService {
 
   async _syncSupplierService(tenantId, service, amount) {
     if (!service) return;
-    const newPaid = toAmount(service.paid_to_supplier_amount) + amount;
+    const { data: currentService } = await supabaseAdmin.from('booking_services').select('paid_to_supplier_amount, cost_to_agency').eq('id', service.id).single();
+    if (!currentService) return;
+
+    const newPaid = toAmount(currentService.paid_to_supplier_amount) + amount;
+    const cost = toAmount(currentService.cost_to_agency);
+    
+    let status = 'unpaid';
+    if (newPaid >= cost && cost > 0) status = 'fully_paid';
+    else if (newPaid > 0) status = 'partially_paid';
+
     await supabaseAdmin
       .from('booking_services')
       .update({
         paid_to_supplier_amount: newPaid,
-        supplier_payment_status: this._nextSupplierStatus(service, newPaid),
+        supplier_payment_status: status,
         last_payment_date: new Date().toISOString().split('T')[0]
       })
       .eq('id', service.id)
@@ -199,8 +211,7 @@ class PaymentService {
       .from('agents_directory')
       .update({
         outstanding_payables: Math.max(0, toAmount(v.outstanding_payables) - amount),
-        total_business_value: toAmount(v.total_business_value) + amount,
-        commission_earned: toAmount(v.commission_earned) + (service ? toAmount(service.commission_amount) : 0)
+        total_payouts: toAmount(v.total_payouts) + amount
       })
       .eq('id', vendorId)
       .eq('tenant_id', tenantId);
@@ -210,7 +221,7 @@ class PaymentService {
    * List transactions with multi-tenant filtering and pagination
    */
   async listTransactions(tenantId, filters) {
-    const { lead_id, page = 1, limit = 50 } = filters;
+    const { lead_id, invoice_id, category, page = 1, limit = 50 } = filters;
     let query = supabaseAdmin
       .from('payment_transactions')
       .select('*', { count: 'exact' })
@@ -220,6 +231,8 @@ class PaymentService {
       .range((page - 1) * limit, page * limit - 1);
 
     if (lead_id) query = query.eq('lead_id', lead_id);
+    if (invoice_id) query = query.eq('invoice_id', invoice_id);
+    if (category) query = query.eq('category', category);
 
     const { data, error, count } = await query;
     if (error) throw error;
@@ -228,42 +241,17 @@ class PaymentService {
   }
 
   /**
-   * Orchestrate data required for payment reminders
-   */
-  async getReminderData(tenantId, leadId, amount) {
-    const { data: lead } = await supabaseAdmin
-      .from('leads')
-      .select('customer_name, customer_phone, destination')
-      .eq('id', leadId)
-      .eq('tenant_id', tenantId)
-      .single();
-
-    if (!lead) throw new Error('Lead not found');
-
-    const { data: tenant } = await supabaseAdmin.from('tenants').select('name, invoice_bank_text').eq('id', tenantId).single();
-
-    return {
-      customer_name: lead.customer_name,
-      customer_phone: lead.customer_phone,
-      agency_name: tenant?.name || 'Intravos Travel',
-      amount: amount || '0',
-      destination: lead.destination || 'your trip',
-      bank_details: tenant?.invoice_bank_text || ''
-    };
-  }
-
-  /**
    * Fetch hydrated transaction for receipt generation
    */
   async getReceiptData(tenantId, transactionId) {
     const { data: payment, error } = await supabaseAdmin
       .from('payment_transactions')
-      .select('*, leads(customer_name, destination), invoices(invoice_number), bank_accounts(account_name, bank_name)')
+      .select('*, leads(customer_name, destination), invoices(id, invoice_number), bank_accounts(account_name, bank_name)')
       .eq('id', transactionId)
       .eq('tenant_id', tenantId)
       .single();
 
-    if (error || !payment) throw new Error('Payment not found');
+    if (error || !payment) return null;
     return payment;
   }
 
@@ -284,25 +272,17 @@ class PaymentService {
 
   // --- HELPERS ---
 
-  _nextInvoiceStatus(invoice, paid) {
-    if (invoice.status === 'cancelled') return 'cancelled';
-    if (paid <= 0) return 'unpaid';
-    if (paid >= toAmount(invoice.total)) return 'paid';
-    return 'partially_paid';
-  }
-
-  _nextSupplierStatus(service, paid) {
-    const cost = toAmount(service.cost_to_agency);
-    if (paid <= 0) return 'unpaid';
-    if (cost > 0 && paid >= cost) return 'fully_paid';
-    return 'partially_paid';
-  }
-
-  async _checkMilestone(userId) {
-    const { data: u } = await supabaseAdmin.from('users').select('milestones').eq('id', userId).single();
-    if (u && !(u.milestones || []).includes('first_payment')) {
-      await supabaseAdmin.from('users').update({ milestones: [...(u.milestones || []), 'first_payment'] }).eq('id', userId);
-    }
+  async _auditPayment(tenantId, userId, trx) {
+    await supabaseAdmin.from('financial_audit_log').insert({
+      tenant_id: tenantId,
+      entity_type: 'payment',
+      entity_id: trx.id,
+      field_changed: 'amount',
+      old_value: '0',
+      new_value: trx.amount,
+      snapshot_after: trx,
+      changed_by: userId
+    });
   }
 
   async _triggerNotification(tenantId, trx) {

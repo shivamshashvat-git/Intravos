@@ -1,46 +1,54 @@
+
 import calendarService from './calendar.service.js';
+import { calendarEventSchema, updateCalendarEventSchema, calendarFilterSchema } from './calendar.schema.js';
 import response from '../../../core/utils/responseHandler.js';
 
-/**
- * CalendarController — Industrialized Multi-tenant Timeline Orchestration
- */
 class CalendarController {
-  
-  /**
-   * Aggregate Multi-module Events
-   */
-  async get__0(req, res, next) {
+  async getEvents(req, res, next) {
     try {
-      const { from, to } = req.query;
-      const features = req.tenant?.features_enabled || [];
+      const filters = calendarFilterSchema.parse(req.query);
       
-      const events = await calendarService.getEvents(req.user.tenantId, from, to, features);
-      
-      return response.success(res, {
-        events,
-        total: events.length,
-        from,
-        to
-      });
+      // If 'agenda' param is passed, we fetch the unified agenda (tasks, bookings, visas)
+      if (req.query.agenda === 'true') {
+        const data = await calendarService.getAgenda(req.user.tenantId, filters.from, filters.to);
+        return response.success(res, { events: data, total: data.length, from: filters.from, to: filters.to });
+      }
+
+      // Otherwise just strict calendar events
+      const data = await calendarService.getEventsInRange(req.user.tenantId, filters.from, filters.to, filters.type);
+      return response.success(res, { events: data, total: data.length, from: filters.from, to: filters.to });
     } catch (error) {
+      if (error.name === 'ZodError') return response.error(res, error.errors[0]?.message, 400);
       next(error);
     }
   }
 
-  /**
-   * Persistence Sync: Refresh calendar_events cache
-   */
-  async post_sync_1(req, res, next) {
+  async createEvent(req, res, next) {
     try {
-      // Authorization Check
-      if (!['admin', 'super_admin'].includes(req.user.role)) {
-        return response.error(res, 'Admin permissions required for sync', 403);
-      }
+      const validated = calendarEventSchema.parse(req.body);
+      const data = await calendarService.createEvent(req.user.tenantId, req.user.id, validated);
+      return response.success(res, data, 'Event created', 201);
+    } catch (error) {
+      if (error.name === 'ZodError') return response.error(res, error.errors[0]?.message, 400);
+      next(error);
+    }
+  }
 
-      const features = req.tenant?.features_enabled || [];
-      const result = await calendarService.syncPersistentEvents(req.user.tenantId, req.user.id, features);
-      
-      return response.success(res, result, 'Calendar cache synchronized successfully');
+  async updateEvent(req, res, next) {
+    try {
+      const validated = updateCalendarEventSchema.parse(req.body);
+      const data = await calendarService.updateEvent(req.user.tenantId, req.params.id, validated);
+      return response.success(res, data, 'Event updated');
+    } catch (error) {
+      if (error.name === 'ZodError') return response.error(res, error.errors[0]?.message, 400);
+      next(error);
+    }
+  }
+
+  async deleteEvent(req, res, next) {
+    try {
+      await calendarService.deleteEvent(req.user.tenantId, req.params.id, req.user);
+      return response.success(res, null, 'Event deleted');
     } catch (error) {
       next(error);
     }

@@ -42,7 +42,7 @@ class PublicService {
       .from('users')
       .select('id')
       .eq('tenant_id', tenantId)
-      .eq('role', 'admin')
+      .eq('role', 'agency_admin')
       .limit(1)
       .single();
 
@@ -196,7 +196,7 @@ class PublicService {
   async requestTripChanges(token, payload) {
      const { data: itinerary } = await supabaseAdmin.from('itineraries').select('id, tenant_id').or(`public_slug.eq.${token},share_token.eq.${token}`).single();
      if (itinerary) {
-        const { data: admin } = await supabaseAdmin.from('users').select('id').eq('tenant_id', itinerary.tenant_id).eq('role', 'admin').limit(1).single();
+        const { data: admin } = await supabaseAdmin.from('users').select('id').eq('tenant_id', itinerary.tenant_id).eq('role', 'agency_admin').limit(1).single();
         if (admin) {
            await supabaseAdmin.from('notifications').insert({
              tenant_id: itinerary.tenant_id,

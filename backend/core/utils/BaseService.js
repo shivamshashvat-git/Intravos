@@ -8,10 +8,10 @@ import { supabaseAdmin } from '../../providers/database/supabase.js';
  * and encapsulates complex database operations.
  */
 export default class BaseService {
-  constructor(req) {
-    this.supabase = req.supabase || supabaseAdmin;
-    this.user = req.user;
-    this.tenantId = req.user?.tenantId;
+  constructor(req = {}) {
+    this.supabase = req?.supabase || supabaseAdmin;
+    this.user = req?.user;
+    this.tenantId = req?.user?.tenantId;
   }
 
   /**

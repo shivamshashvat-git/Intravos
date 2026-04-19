@@ -3,7 +3,7 @@ import { X, Loader2 } from 'lucide-react';
 import { leadsService } from '@/features/crm/services/leadsService';
 import { useAuth } from '@/core/hooks/useAuth';
 import { Lead, LeadSource, LeadPriority } from '@/features/crm/types/lead';
-import { supabase } from '@/core/lib/supabase';
+import { apiClient } from '@/core/lib/apiClient';
 
 interface CreateLeadDrawerProps {
   isOpen: boolean;
@@ -63,12 +63,15 @@ export const CreateLeadDrawer: React.FC<CreateLeadDrawerProps> = ({ isOpen, onCl
 
   const fetchUsers = async () => {
     if (!tenant?.id) return;
-    const { data } = await supabase
-      .from('users')
-      .select('id, name')
-      .eq('tenant_id', tenant.id)
-      .eq('is_active', true);
-    if (data) setUsers(data);
+    try {
+      const res = await apiClient(`/api/system/users`);
+      if (res.ok) {
+        const result = await res.json();
+        setUsers(result.data?.users || result.data || []);
+      }
+    } catch (e) {
+      console.error('Failed to fetch users', e);
+    }
   };
 
   const validate = () => {

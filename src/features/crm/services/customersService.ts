@@ -1,184 +1,183 @@
-import { supabase } from '@/core/lib/supabase';
+import { apiClient } from '@/core/lib/apiClient';
 import { Customer, CustomerFilters, AssociatedTraveler } from '@/features/crm/types/customer';
 
+/**
+ * CustomersService — Frontend bridge to Industrialized Backend
+ * No direct Supabase calls here. All auth logic is handled in apiClient.
+ */
+const BASE = (import.meta.env.VITE_API_URL || '') + '/api/v1/crm/customers';
+
 export const customersService = {
-  async getCustomers(tenantId: string, filters?: CustomerFilters, page = 1, pageSize = 25) {
-    let query = supabase
-      .from('customers')
-      .select('id, tenant_id, name, phone, email, city, customer_type, tags, total_spent, bookings_count, last_booking_at, created_at', { count: 'exact' })
-      .eq('tenant_id', tenantId)
-      .eq('is_archived', false)
-      .is('deleted_at', null);
+  
+  // ── CORE CRUD ──
 
+  async getCustomers(filters?: CustomerFilters, page = 1, pageSize = 25) {
+    const params = new URLSearchParams();
     if (filters) {
-      if (filters.customer_type && filters.customer_type !== 'all') {
-        query = query.eq('customer_type', filters.customer_type);
-      }
-      if (filters.search) {
-        query = query.or(`name.ilike.%${filters.search}%,phone.ilike.%${filters.search}%,email.ilike.%${filters.search}%,city.ilike.%${filters.search}%`);
-      }
-      if (filters.tags && filters.tags.length > 0) {
-        query = query.contains('tags', filters.tags);
-      }
-      if (filters.lead_source) {
-        query = query.eq('lead_source', filters.lead_source);
-      }
+      if (filters.customer_type && filters.customer_type !== 'all') params.append('customer_type', filters.customer_type);
+      if (filters.search) params.append('search', filters.search);
+      if (filters.tags && filters.tags.length > 0) filters.tags.forEach(t => params.append('tags', t));
     }
+    params.append('page', page.toString());
+    params.append('limit', pageSize.toString());
 
-    const from = (page - 1) * pageSize;
-    const to = from + pageSize - 1;
+    const response = await apiClient(`${BASE}?${params.toString()}`);
+    if (!response.ok) throw new Error('Failed to fetch customers');
 
-    const { data, count, error } = await query
-      .order('created_at', { ascending: false })
-      .range(from, to);
-
-    if (error) throw error;
-    return { data: data as Customer[], count: count || 0 };
+    const { data } = await response.json();
+    return { 
+      data: (data.customers || []) as (Customer & { health_score?: number })[], 
+      total: data.total || 0 
+    };
   },
 
   async getCustomerById(id: string) {
-    const { data: customer, error: customerError } = await supabase
-      .from('customers')
-      .select('*')
-      .eq('id', id)
-      .is('deleted_at', null)
-      .single();
+    const response = await apiClient(`${BASE}/${id}`);
+    if (!response.ok) throw new Error('Failed to fetch customer profile');
 
-    if (customerError) throw customerError;
-
-    const { data: travelers, error: travelerError } = await supabase
-      .from('associated_travelers')
-      .select('*')
-      .eq('customer_id', id)
-      .is('deleted_at', null);
-
-    if (travelerError) throw travelerError;
-
-    return { customer: customer as Customer, travelers: (travelers || []) as AssociatedTraveler[] };
+    const { data } = await response.json();
+    return {
+      customer: data.customer as Customer,
+      health: data.health || null,
+      travelers: (data.customer.associated_travelers || []) as AssociatedTraveler[]
+    };
   },
 
   async createCustomer(data: Partial<Customer>) {
-    const { data: customer, error } = await supabase
-      .from('customers')
-      .insert(data)
-      .select()
-      .single();
+    const response = await apiClient(BASE, {
+      method: 'POST',
+      body: JSON.stringify(data)
+    });
+    if (!response.ok) throw new Error('Failed to create customer');
 
-    if (error) throw error;
-    return customer as Customer;
+    const { data: result } = await response.json();
+    return result.customer as Customer;
   },
 
   async updateCustomer(id: string, data: Partial<Customer>) {
-    const { data: customer, error } = await supabase
-      .from('customers')
-      .update(data)
-      .eq('id', id)
-      .select()
-      .single();
+    const response = await apiClient(`${BASE}/${id}`, {
+      method: 'PATCH',
+      body: JSON.stringify(data)
+    });
+    if (!response.ok) throw new Error('Failed to update customer');
 
-    if (error) throw error;
-    return customer as Customer;
-  },
-
-  async archiveCustomer(id: string) {
-    const { error } = await supabase
-      .from('customers')
-      .update({ is_archived: true })
-      .eq('id', id);
-
-    if (error) throw error;
+    const { data: result } = await response.json();
+    return result.customer as Customer;
   },
 
   async deleteCustomer(id: string) {
-    const { error } = await supabase
-      .from('customers')
-      .update({ deleted_at: new Date().toISOString() })
-      .eq('id', id);
-
-    if (error) throw error;
+    const response = await apiClient(`${BASE}/${id}`, { method: 'DELETE' });
+    if (!response.ok) throw new Error('Failed to delete customer');
+    return true;
   },
 
-  async getAssociatedTravelers(customerId: string) {
-    const { data, error } = await supabase
-      .from('associated_travelers')
-      .select('*')
-      .eq('customer_id', customerId)
-      .is('deleted_at', null);
+  // ── TRAVELERS ──
 
-    if (error) throw error;
+  async getTravelers(customerId: string) {
+    const response = await apiClient(`${BASE}/${customerId}/travelers`);
+    if (!response.ok) throw new Error('Failed to fetch travelers');
+    const { data } = await response.json();
     return data as AssociatedTraveler[];
   },
 
-  async createAssociatedTraveler(data: Partial<AssociatedTraveler>) {
-    const { data: traveler, error } = await supabase
-      .from('associated_travelers')
-      .insert(data)
-      .select()
-      .single();
-
-    if (error) throw error;
-    return traveler as AssociatedTraveler;
+  async addTraveler(customerId: string, data: Partial<AssociatedTraveler>) {
+    const response = await apiClient(`${BASE}/${customerId}/travelers`, {
+      method: 'POST',
+      body: JSON.stringify(data)
+    });
+    if (!response.ok) throw new Error('Failed to add traveler');
+    const { data: result } = await response.json();
+    return result as AssociatedTraveler;
   },
 
-  async updateAssociatedTraveler(id: string, data: Partial<AssociatedTraveler>) {
-    const { data: traveler, error } = await supabase
-      .from('associated_travelers')
-      .update(data)
-      .eq('id', id)
-      .select()
-      .single();
+  // ── CRM ENGINE FEATURES ──
 
-    if (error) throw error;
-    return traveler as AssociatedTraveler;
-  },
-
-  async deleteAssociatedTraveler(id: string) {
-    const { error } = await supabase
-      .from('associated_travelers')
-      .update({ deleted_at: new Date().toISOString() })
-      .eq('id', id);
-    if (error) throw error;
-  },
-
-  async getCustomerLeads(customerId: string, tenantId: string, phone?: string) {
-    let query = supabase
-      .from('leads')
-      .select('*')
-      .eq('tenant_id', tenantId)
-      .is('deleted_at', null);
-      
-    if (phone) {
-      query = query.or(`customer_id.eq.${customerId},customer_phone.eq.${phone}`);
-    } else {
-      query = query.eq('customer_id', customerId);
-    }
-
-    const { data, error } = await query.order('created_at', { ascending: false });
-    if (error) throw error;
+  async getDuplicatePhones() {
+    const response = await apiClient(`${BASE}/duplicate-phones`);
+    if (!response.ok) throw new Error('Failed to fetch duplicates');
+    const { data } = await response.json();
     return data;
   },
 
-  async getCustomerQuotations(customerId: string, tenantId: string) {
-    const { data, error } = await supabase
-      .from('quotations')
-      .select('*')
-      .eq('customer_id', customerId)
-      .eq('tenant_id', tenantId)
-      .is('deleted_at', null)
-      .order('created_at', { ascending: false });
-    if (error) throw error;
+  async getUpcomingBirthdays() {
+    const response = await apiClient(`${BASE}/engagement/birthdays`);
+    const { data } = await response.json();
     return data;
   },
 
-  async getCustomerInvoices(customerId: string, tenantId: string) {
-    const { data, error } = await supabase
-      .from('invoices')
-      .select('*')
-      .eq('customer_id', customerId)
-      .eq('tenant_id', tenantId)
-      .is('deleted_at', null)
-      .order('created_at', { ascending: false });
-    if (error) throw error;
+  async getUpcomingAnniversaries() {
+    const response = await apiClient(`${BASE}/engagement/anniversaries`);
+    const { data } = await response.json();
+    return data;
+  },
+
+  async getDormantCustomers() {
+    const response = await apiClient(`${BASE}/engagement/dormant`);
+    const { data } = await response.json();
+    return data;
+  },
+
+  // ── CONFIG & TEMPLATES ──
+
+  async getMessageTemplates() {
+    const response = await apiClient(`${BASE}/config/templates`);
+    const { data } = await response.json();
+    return data;
+  },
+
+  async createMessageTemplate(data: any) {
+    const response = await apiClient(`${BASE}/config/templates`, {
+      method: 'POST',
+      body: JSON.stringify(data)
+    });
+    const { data: result } = await response.json();
+    return result;
+  },
+
+  // ── FEEDBACK & REFERRALS ──
+
+  async requestFeedback(bookingId: string, customerId: string) {
+    const response = await apiClient(`${BASE}/feedback/request`, {
+      method: 'POST',
+      body: JSON.stringify({ booking_id: bookingId, customer_id: customerId })
+    });
+    const { data } = await response.json();
+    return data;
+  },
+
+  async getReferrals() {
+    const response = await apiClient(`${BASE}/referrals`);
+    const { data } = await response.json();
+    return data;
+  },
+
+  async createReferral(data: any) {
+    const response = await apiClient(`${BASE}/referrals`, {
+      method: 'POST',
+      body: JSON.stringify(data)
+    });
+    const { data: result } = await response.json();
+    return result;
+  },
+
+  // ── RELATIONS ──
+
+  async getCustomerBookings(id: string) {
+    const response = await apiClient(`${BASE}/${id}/bookings`);
+    if (!response.ok) throw new Error('Failed to fetch bookings');
+    const { data } = await response.json();
+    return data;
+  },
+
+  async getCustomerQuotations(id: string) {
+    const response = await apiClient(`${BASE}/${id}/quotations`);
+    const { data } = await response.json();
+    return data;
+  },
+
+  async getCustomerInvoices(id: string) {
+    const response = await apiClient(`${BASE}/${id}/invoices`);
+    const { data } = await response.json();
     return data;
   }
 };

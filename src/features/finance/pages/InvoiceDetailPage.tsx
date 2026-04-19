@@ -22,7 +22,7 @@ export const InvoiceDetailPage: React.FC = () => {
   const { invoice, isLoading, recordPayment, updateStatus, deletePayment, generatePaymentLink } = useInvoiceDetail(id!);
   const [isPaymentDrawerOpen, setIsPaymentDrawerOpen] = useState(false);
 
-  const isAdmin = user?.role === 'admin' || user?.role === 'super_admin';
+  const isAdmin = ['admin', 'agency_admin', 'super_admin'].includes(user?.role || '');
 
   if (isLoading || !invoice) return <div className="h-screen flex items-center justify-center font-black italic text-slate-300 uppercase tracking-widest">Hydrating Resource...</div>;
 

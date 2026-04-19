@@ -1,4 +1,5 @@
 import { triggerSudoModal, getActiveSudoToken } from '@/core/hooks/useSudo';
+import { supabase } from '@/core/lib/supabase';
 
 interface RequestOptions extends RequestInit {
   sudoRequested?: boolean;
@@ -7,6 +8,13 @@ interface RequestOptions extends RequestInit {
 export const apiClient = async (url: string, options: RequestOptions = {}): Promise<Response> => {
   const headers = new Headers(options.headers || {});
   
+  // ── AUTOMATIC AUTH ──
+  // We centralize token management here so domain services don't call Supabase directly.
+  const { data: { session } } = await supabase.auth.getSession();
+  if (session?.access_token) {
+    headers.set('Authorization', `Bearer ${session.access_token}`);
+  }
+
   // Attach sudo token if active
   const sudoToken = getActiveSudoToken();
   if (sudoToken) {

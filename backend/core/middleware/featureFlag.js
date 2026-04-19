@@ -24,8 +24,9 @@ export function requireFeature(featureName) {
     // Per-user feature scoping:
     // If user has features_override set (staff with restricted access), use it.
     // Admin role inherits tenant-level features. Staff with NULL override also inherits.
+    const adminRoles = ['admin', 'agency_admin', 'secondary_admin'];
     const userOverride = req.user?.features_override;
-    const effectiveFeatures = (req.user?.role === 'admin' || !userOverride)
+    const effectiveFeatures = (adminRoles.includes(req.user?.role) || !userOverride)
       ? (req.tenant.features_enabled || [])
       : userOverride;
 
@@ -52,8 +53,9 @@ export function requireVisibleFeature(featureName) {
     }
 
     // Per-user override takes priority for visibility too
+    const adminRoles = ['admin', 'agency_admin', 'secondary_admin'];
     const userOverride = req.user?.features_override;
-    const effectiveVisible = (req.user?.role === 'admin' || !userOverride)
+    const effectiveVisible = (adminRoles.includes(req.user?.role) || !userOverride)
       ? (req.tenant.features_visible || [])
       : userOverride;
 
@@ -77,7 +79,8 @@ export function getEffectiveFeatures(user, tenant) {
   if (user.role === 'super_admin') {
     return tenant.features_enabled || [];
   }
-  if (user.role === 'admin') {
+  const adminRoles = ['admin', 'agency_admin', 'secondary_admin'];
+  if (adminRoles.includes(user.role)) {
     return tenant.features_enabled || [];
   }
   // Staff: use override if set, else tenant defaults

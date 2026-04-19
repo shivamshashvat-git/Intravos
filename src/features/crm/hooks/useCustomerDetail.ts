@@ -14,7 +14,7 @@ export function useCustomerDetail(customerId: string) {
   const [error, setError] = useState<string | null>(null);
 
   const fetchCustomerData = useCallback(async () => {
-    if (!customerId || !tenant?.id) return;
+    if (!customerId) return;
     setIsLoading(true);
     setError(null);
     try {
@@ -22,21 +22,21 @@ export function useCustomerDetail(customerId: string) {
       setCustomer(custData);
       setTravelers(travData);
 
-      const [leadsData, quotesData, invoicesData] = await Promise.all([
-        customersService.getCustomerLeads(customerId, tenant.id, custData.phone || undefined),
-        customersService.getCustomerQuotations(customerId, tenant.id),
-        customersService.getCustomerInvoices(customerId, tenant.id)
+      const [quotesData, invoicesData, bookingsData] = await Promise.all([
+        customersService.getCustomerQuotations(customerId),
+        customersService.getCustomerInvoices(customerId),
+        customersService.getCustomerBookings(customerId)
       ]);
 
-      setLeads(leadsData);
       setQuotations(quotesData);
       setInvoices(invoicesData);
+      setLeads([]); // Note: Leadhistory handled via relations if needed
     } catch (err: any) {
       setError(err.message || 'Failed to load customer details');
     } finally {
       setIsLoading(false);
     }
-  }, [customerId, tenant?.id]);
+  }, [customerId]);
 
   useEffect(() => {
     fetchCustomerData();

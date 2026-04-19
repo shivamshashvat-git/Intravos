@@ -7,10 +7,13 @@ import { authenticate  } from '../../../core/middleware/auth.js';
 import { requireStaff, requireAdmin, requireWriteAccess } from '../../../core/middleware/rbac.js';
 import { requireFeature } from '../../../core/middleware/featureFlag.js';
 
-import { asyncHandler  } from '../../../core/middleware/errorHandler.js';
-import { softDeleteDirect  } from '../../../core/utils/softDelete.js';
+import { asyncHandler } from '../../../core/middleware/errorHandler.js';
+import { softDeleteDirect } from '../../../core/utils/softDelete.js';
+import { financialBlinder } from '../../../core/middleware/financialBlinder.js';
 
 const router = express.Router();
+
+router.use(financialBlinder);
 
 // ── ZOD SCHEMAS ──
 const quotationItemSchema = z.object({
@@ -66,29 +69,21 @@ async function fetchQuotationWithItems(tenantId, quotationId, { includeLead = fa
 // GET /api/quotations/share/:token — public endpoint for customer viewing
 router.get('/share/:token', asyncHandler((req, res) => quotationsController.get_share__token_8(req, res)));
 
-// GET /api/quotations — list quotations
-router.get('/', authenticate, requireStaff(), requireFeature('quotations'), asyncHandler((req, res) => quotationsController.get__0(req, res)));;
+// ── LIST ──
+router.get('/', authenticate, requireStaff(), requireFeature('quotations'), asyncHandler((req, res, next) => quotationsController.listQuotations(req, res, next)));
 
-// GET /api/quotations/:id — single quotation with line items
-router.get('/:id', authenticate, requireStaff(), asyncHandler((req, res) => quotationsController.get_id_1(req, res)));;
+// ── ACTIONS ──
+router.post('/', authenticate, requireStaff(), requireWriteAccess, requireFeature('quotations'), validate(quotationCreateSchema), asyncHandler((req, res, next) => quotationsController.createQuotation(req, res, next)));
 
-router.get('/:id/pdf', authenticate, requireStaff(), requireFeature('quotations'), asyncHandler((req, res) => quotationsController.get_id_pdf_2(req, res)));;
+// ── DETAIL & MUTATIONS ──
+router.get('/:id', authenticate, requireStaff(), asyncHandler((req, res, next) => quotationsController.getQuotationById(req, res, next)));
+router.get('/:id/pdf', authenticate, requireStaff(), asyncHandler((req, res, next) => quotationsController.getQuotationPdf(req, res, next)));
+router.patch('/:id', authenticate, requireStaff(), requireWriteAccess, asyncHandler((req, res, next) => quotationsController.updateQuotation(req, res, next)));
+router.delete('/:id', authenticate, requireAdmin(), requireWriteAccess, requireFeature('quotations'), asyncHandler((req, res, next) => quotationsController.deleteQuotation(req, res, next)));
 
-// POST /api/quotations — create quotation from lead
-router.post('/', authenticate, requireStaff(), requireWriteAccess, requireFeature('quotations'), asyncHandler((req, res) => quotationsController.post__3(req, res)));;
-
-// PATCH /api/quotations/:id — update status
-router.patch('/:id', authenticate, requireStaff(), requireWriteAccess, asyncHandler((req, res) => quotationsController.patch_id_4(req, res)));;
-
-router.delete('/:id', authenticate, requireAdmin(), requireWriteAccess, requireFeature('quotations'), asyncHandler((req, res) => quotationsController.delete_id_5(req, res)));;
-
-// POST /api/quotations/:id/revise — create a new version
-router.post('/:id/revise', authenticate, requireStaff(), requireWriteAccess, asyncHandler((req, res) => quotationsController.post_id_revise_6(req, res)));;
-
-// POST /api/quotations/:id/convert-to-invoice — create invoice from accepted quotation
-router.post('/:id/convert-to-invoice', authenticate, requireStaff(), requireWriteAccess, requireFeature('invoicing'), asyncHandler((req, res) => quotationsController.post_id_convert_to_invoice_7(req, res)));;
-
-// POST /api/quotations/:id/duplicate — clone a quotation as new draft
-router.post('/:id/duplicate', authenticate, requireStaff(), requireWriteAccess, requireFeature('quotations'), asyncHandler((req, res) => quotationsController.post_id_duplicate_9(req, res)));
+// ── WORKFLOWS ──
+router.post('/:id/revise', authenticate, requireStaff(), requireWriteAccess, asyncHandler((req, res, next) => quotationsController.reviseQuotation(req, res, next)));
+router.post('/:id/convert', authenticate, requireStaff(), requireWriteAccess, requireFeature('invoicing'), asyncHandler((req, res, next) => quotationsController.convertToInvoice(req, res, next)));
+router.post('/:id/duplicate', authenticate, requireStaff(), requireWriteAccess, requireFeature('quotations'), asyncHandler((req, res, next) => quotationsController.duplicateQuotation(req, res, next)));
 
 export default router;

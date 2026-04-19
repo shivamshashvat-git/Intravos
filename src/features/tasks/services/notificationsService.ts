@@ -14,81 +14,61 @@ export interface Notification {
   created_at: string;
 }
 
+const getHeaders = async () => {
+  const { data: sessionData } = await supabase.auth.getSession();
+  return {
+    'Content-Type': 'application/json',
+    'Authorization': `Bearer ${sessionData.session?.access_token}`
+  };
+};
+
 export const notificationsService = {
   async getNotifications(userId: string, tenantId: string, filters?: { type?: string, unread_only?: boolean, page?: number, limit?: number }) {
-    const { type, unread_only, page = 1, limit = 20 } = filters || {};
-    
-    let query = supabase
-      .from('notifications')
-      .select('*', { count: 'exact' })
-      .eq('user_id', userId)
-      .eq('tenant_id', tenantId)
-      .is('deleted_at', null)
-      .order('created_at', { ascending: false });
+    const params = new URLSearchParams();
+    if (filters?.type) params.append('type', filters.type);
+    if (filters?.unread_only) params.append('unread_only', 'true');
+    if (filters?.page) params.append('page', String(filters.page));
+    if (filters?.limit) params.append('limit', String(filters.limit));
 
-    if (unread_only) {
-      query = query.eq('is_read', false);
-    }
-
-    if (type && type !== 'all') {
-      // Map frontend filters to backend notif_type if necessary
-      query = query.eq('notif_type', type);
-    }
-
-    const from = (page - 1) * limit;
-    const to = from + limit - 1;
-
-    const { data, count, error } = await query.range(from, to);
-    if (error) throw error;
-    return { data: data as Notification[], count: count || 0 };
+    const res = await fetch((import.meta.env.VITE_API_URL || '') + `/api/system/notifications?${params.toString()}`, {
+      headers: await getHeaders()
+    });
+    if (!res.ok) throw new Error('Failed to fetch notifications');
+    const result = await res.json();
+    return { data: result.data?.notifications || [], count: result.data?.total || 0 };
   },
 
   async getUnreadNotifications(userId: string, tenantId: string) {
-    const { data, error } = await supabase
-      .from('notifications')
-      .select('*')
-      .eq('user_id', userId)
-      .eq('tenant_id', tenantId)
-      .eq('is_read', false)
-      .is('deleted_at', null)
-      .order('created_at', { ascending: false })
-      .limit(20);
-    if (error) throw error;
-    return data as Notification[];
+    const result = await this.getNotifications(userId, tenantId, { unread_only: true, limit: 20 });
+    return result.data;
   },
 
   async getUnreadCount(userId: string, tenantId: string) {
-    const { count, error } = await supabase
-      .from('notifications')
-      .select('*', { count: 'exact', head: true })
-      .eq('user_id', userId)
-      .eq('tenant_id', tenantId)
-      .eq('is_read', false)
-      .is('deleted_at', null);
-    if (error) throw error;
-    return count || 0;
+    const result = await this.getNotifications(userId, tenantId, { unread_only: true, limit: 1 });
+    return result.count;
   },
 
   async markAsRead(id: string) {
-    const { error } = await supabase.from('notifications').update({ is_read: true }).eq('id', id);
-    if (error) throw error;
+    const res = await fetch((import.meta.env.VITE_API_URL || '') + `/api/system/notifications/${id}/read`, {
+      method: 'PATCH',
+      headers: await getHeaders()
+    });
+    if (!res.ok) throw new Error('Failed to mark read');
   },
 
   async markAllAsRead(userId: string, tenantId: string) {
-    const { error } = await supabase
-      .from('notifications')
-      .update({ is_read: true })
-      .eq('user_id', userId)
-      .eq('tenant_id', tenantId)
-      .eq('is_read', false);
-    if (error) throw error;
+    const res = await fetch((import.meta.env.VITE_API_URL || '') + `/api/system/notifications/read-all`, {
+      method: 'PATCH',
+      headers: await getHeaders()
+    });
+    if (!res.ok) throw new Error('Failed to mark all read');
   },
 
   async deleteNotification(id: string) {
-    const { error } = await supabase
-      .from('notifications')
-      .update({ deleted_at: new Date().toISOString() })
-      .eq('id', id);
-    if (error) throw error;
+    const res = await fetch((import.meta.env.VITE_API_URL || '') + `/api/system/notifications/${id}`, {
+      method: 'DELETE',
+      headers: await getHeaders()
+    });
+    if (!res.ok) throw new Error('Failed to delete notification');
   }
 };

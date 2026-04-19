@@ -24,7 +24,7 @@ import { LeadStatus, LeadSource, LeadPriority } from '@/features/crm/types/lead'
 import { leadsService } from '@/features/crm/services/leadsService';
 import { format } from 'date-fns';
 import { useAuth } from '@/core/hooks/useAuth';
-import { supabase } from '@/core/lib/supabase';
+import { usersService } from '@/features/system/services/usersService';
 
 export const LeadsPage: React.FC = () => {
   const { tenant } = useAuth();
@@ -51,12 +51,12 @@ export const LeadsPage: React.FC = () => {
 
   useEffect(() => {
     if (tenant?.id) {
-       supabase.from('users').select('id, name').eq('tenant_id', tenant.id).then(({ data }) => {
-         if (data) {
-           const userMap: Record<string, string> = {};
-           data.forEach(u => userMap[u.id] = u.name);
-           setUsers(userMap);
-         }
+       usersService.listUsers().then((data) => {
+         const userMap: Record<string, string> = {};
+         data.forEach(u => userMap[u.id] = u.name);
+         setUsers(userMap);
+       }).catch(err => {
+         console.error('Failed to load users for assignment labels:', err);
        });
     }
   }, [tenant?.id]);

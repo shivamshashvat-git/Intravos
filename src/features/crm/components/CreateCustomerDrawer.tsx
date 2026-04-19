@@ -84,8 +84,6 @@ export const CreateCustomerDrawer: React.FC<CreateCustomerDrawerProps> = ({
     try {
       const newCustomer = await customersService.createCustomer({
         ...formData,
-        tenant_id: tenant.id,
-        created_by: user?.id,
         date_of_birth: formData.date_of_birth || null,
         wedding_anniversary: formData.wedding_anniversary || null,
         // Ensure nulls for empty strings

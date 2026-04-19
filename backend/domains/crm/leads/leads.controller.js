@@ -116,6 +116,18 @@ class LeadsController {
   }
 
   /**
+   * Fetch pipeline analytics
+   */
+  async getAnalytics(req, res, next) {
+    try {
+      const data = await leadService.getAnalytics(req.user.tenantId);
+      return response.success(res, data);
+    } catch (error) {
+      next(error);
+    }
+  }
+
+  /**
    * Fetch lead modification history
    */
   async getLeadModifications(req, res, next) {
@@ -136,23 +148,24 @@ class LeadsController {
   }
 
   /**
+   * Lead Notes
+   */
+  async getLeadNotes(req, res, next) {
+    try {
+      const data = await leadService.getLeadNotes(req.user.tenantId, req.params.id);
+      return response.success(res, data);
+    } catch (error) {
+      next(error);
+    }
+  }
+
+  /**
    * Add a note to a lead
    */
   async addLeadNote(req, res, next) {
     try {
       const { content } = req.body;
-      const { data, error } = await supabaseAdmin
-        .from('lead_notes')
-        .insert({
-          tenant_id: req.user.tenantId,
-          lead_id: req.params.id,
-          user_id: req.user.id,
-          content
-        })
-        .select()
-        .single();
-      
-      if (error) throw error;
+      const data = await leadService.addLeadNote(req.user.tenantId, req.user.id, req.params.id, content);
       return response.success(res, data, 'Note added');
     } catch (error) {
       next(error);
@@ -164,20 +177,29 @@ class LeadsController {
    */
   async recordLeadCommunication(req, res, next) {
     try {
-      const { data, error } = await supabaseAdmin
-        .from('engagement_log')
-        .insert({
-          ...req.body,
-          tenant_id: req.user.tenantId,
-          user_id: req.user.id,
-          entity_type: 'lead',
-          entity_id: req.params.id
-        })
-        .select()
-        .single();
-      
-      if (error) throw error;
+      const data = await leadService.recordLeadCommunication(req.user.tenantId, req.user.id, req.params.id, req.body);
       return response.success(res, data, 'Communication recorded');
+    } catch (error) {
+      next(error);
+    }
+  }
+
+  /**
+   * Lead Follow-ups
+   */
+  async getLeadFollowups(req, res, next) {
+    try {
+      const data = await leadService.getLeadFollowups(req.user.tenantId, req.params.id);
+      return response.success(res, data);
+    } catch (error) {
+      next(error);
+    }
+  }
+
+  async addLeadFollowup(req, res, next) {
+    try {
+      const data = await leadService.addLeadFollowup(req.user.tenantId, req.user.id, req.params.id, req.body);
+      return response.success(res, data, 'Follow-up scheduled');
     } catch (error) {
       next(error);
     }

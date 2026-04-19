@@ -164,6 +164,20 @@ const TRASH_TABLES = {
       return data;
     },
   },
+  calendar_events: {
+    moduleLabel: 'Calendar',
+    requireFeature: 'trash',
+    async getRecord(id, tenantId) {
+      const { data, error } = await supabaseAdmin
+        .from('calendar_events')
+        .select('id, tenant_id, title, deleted_at, deleted_by')
+        .eq('id', id)
+        .eq('tenant_id', tenantId)
+        .maybeSingle();
+      if (error) throw error;
+      return data;
+    },
+  },
   offers: {
     moduleLabel: 'Offers',
     requireFeature: 'trash',

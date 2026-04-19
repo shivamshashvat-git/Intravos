@@ -21,7 +21,7 @@ export const MarkupPresetsPage: React.FC = () => {
   const [drawerOpen, setDrawerOpen] = useState(false);
   const [editingPreset, setEditingPreset] = useState<MarkupPreset | null>(null);
 
-  const isAdmin = user?.role === 'admin' || user?.role === 'super_admin';
+  const isAdmin = ['admin', 'agency_admin', 'super_admin'].includes(user?.role || '');
 
   const stats = useMemo(() => {
     const defaultPreset = presets.find(p => p.is_default);

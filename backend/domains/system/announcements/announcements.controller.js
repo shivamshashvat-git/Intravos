@@ -1,3 +1,4 @@
+import { announcementSchema, updateAnnouncementSchema } from './announcements.schema.js';
 import announcementService from './announcements.service.js';
 import response from '../../../core/utils/responseHandler.js';
 

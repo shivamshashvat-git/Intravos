@@ -3,8 +3,8 @@ import { clsx } from 'clsx';
 import { useNavigate } from 'react-router-dom';
 import { X, Globe, Calendar, FileText, Check, Search, User } from 'lucide-react';
 import { itinerariesService } from '@/features/operations/services/itinerariesService';
+import { customersService } from '@/features/crm/services/customersService';
 import { useAuth } from '@/core/hooks/useAuth';
-import { supabase } from '@/core/lib/supabase';
 
 interface CreateItineraryDrawerProps {
   isOpen: boolean;
@@ -36,8 +36,14 @@ export const CreateItineraryDrawer: React.FC<CreateItineraryDrawerProps> = ({ is
   const handleSearch = async (val: string) => {
     setSearchQuery(val);
     if (val.length < 2) { setSearchResults([]); return; }
-    const { data } = await supabase.from('customers').select('*').ilike('name', `%${val}%`).limit(5);
-    setSearchResults(data || []);
+    if (!tenant?.id) return;
+    try {
+      const { data } = await customersService.getCustomers(tenant.id, { search: val }, 1, 5);
+      setSearchResults(data || []);
+    } catch (e) {
+      console.error(e);
+      setSearchResults([]);
+    }
   };
 
   const selectCustomer = (c: any) => {

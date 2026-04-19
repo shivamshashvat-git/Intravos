@@ -1,3 +1,4 @@
+
 import { useState, useEffect, useCallback } from 'react';
 import { Booking, BookingService, GroupMember, BookingStatus } from '../types/booking';
 import { bookingsService } from '../services/bookingsService';
@@ -5,7 +6,7 @@ import { useAuth } from '@/core/hooks/useAuth';
 
 export function useBookingDetail(id: string) {
   const { tenant } = useAuth();
-  const [booking, setBooking] = useState<Booking | null>(null);
+  const [hub, setHub] = useState<any>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
@@ -13,8 +14,8 @@ export function useBookingDetail(id: string) {
     if (!id || !tenant?.id) return;
     setIsLoading(true);
     try {
-      const data = await bookingsService.getBookingById(id, tenant.id);
-      setBooking(data);
+      const data = await bookingsService.getBookingHub(id);
+      setHub(data);
     } catch (e: any) {
       setError(e.message);
     } finally {
@@ -26,9 +27,9 @@ export function useBookingDetail(id: string) {
     fetchData();
   }, [fetchData]);
 
-  const updateStatus = async (status: BookingStatus, reason?: string) => {
+  const updateStatus = async (status: BookingStatus) => {
     try {
-      await bookingsService.updateStatus(id, status, reason);
+      await bookingsService.updateBooking(id, { status });
       await fetchData();
     } catch (e) {
       console.error(e);
@@ -36,20 +37,39 @@ export function useBookingDetail(id: string) {
     }
   };
 
-  const addService = async (service: Partial<BookingService>) => {
-    if (!tenant?.id) return;
+  const cancelBooking = async (payload: any) => {
     try {
-      await bookingsService.addService(id, tenant.id, service);
+        await bookingsService.cancelBooking(id, payload);
+        await fetchData();
+    } catch (e) {
+        console.error(e);
+        throw e;
+    }
+  }
+
+  const addService = async (service: any) => {
+    try {
+      await bookingsService.addService(id, service);
       await fetchData();
     } catch (e) {
       console.error(e);
       throw e;
     }
   };
+
+  const updateService = async (serviceId: string, updates: any) => {
+    try {
+        await bookingsService.updateService(id, serviceId, updates);
+        await fetchData();
+    } catch (e) {
+        console.error(e);
+        throw e;
+    }
+  }
 
   const deleteService = async (serviceId: string) => {
     try {
-      await bookingsService.deleteService(serviceId);
+      await bookingsService.deleteService(id, serviceId);
       await fetchData();
     } catch (e) {
       console.error(e);
@@ -57,20 +77,29 @@ export function useBookingDetail(id: string) {
     }
   };
 
-  const addMember = async (member: Partial<GroupMember>) => {
-    if (!tenant?.id) return;
+  const addMember = async (member: any) => {
     try {
-      await bookingsService.addMember(id, tenant.id, member);
+      await bookingsService.addGroupMember(id, member);
       await fetchData();
     } catch (e) {
       console.error(e);
       throw e;
     }
   };
+
+  const updateMember = async (memberId: string, updates: any) => {
+    try {
+        await bookingsService.updateGroupMember(memberId, updates);
+        await fetchData();
+    } catch (e) {
+        console.error(e);
+        throw e;
+    }
+  }
 
   const deleteMember = async (memberId: string) => {
     try {
-      await bookingsService.deleteMember(memberId);
+      await bookingsService.deleteGroupMember(memberId);
       await fetchData();
     } catch (e) {
       console.error(e);
@@ -78,7 +107,7 @@ export function useBookingDetail(id: string) {
     }
   };
 
-  const updateBookingValue = async (updates: Partial<Booking>) => {
+  const updateBooking = async (updates: Partial<Booking>) => {
       try {
           await bookingsService.updateBooking(id, updates);
           await fetchData();
@@ -89,15 +118,19 @@ export function useBookingDetail(id: string) {
   };
 
   return {
-    booking,
+    booking: hub?.booking,
+    hub,
     isLoading,
     error,
     refresh: fetchData,
     updateStatus,
+    cancelBooking,
     addService,
+    updateService,
     deleteService,
     addMember,
+    updateMember,
     deleteMember,
-    updateBookingValue
+    updateBooking
   };
 }

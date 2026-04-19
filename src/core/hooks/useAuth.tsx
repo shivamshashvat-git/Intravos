@@ -1,6 +1,7 @@
 import React, { createContext, useContext, useEffect, useState } from 'react';
-import { Session, User } from '@supabase/supabase-js';
+import { Session } from '@supabase/supabase-js';
 import { supabase } from '@/core/lib/supabase';
+import { apiClient } from '@/core/lib/apiClient';
 
 interface Tenant {
   id: string;
@@ -20,7 +21,7 @@ interface AppUser {
   auth_id: string;
   email: string;
   name: string;
-  role: 'super_admin' | 'admin' | 'staff' | 'partner';
+  role: 'super_admin' | 'platform_manager' | 'ivobot' | 'agency_admin' | 'secondary_admin' | 'admin' | 'staff' | 'partner';
   avatar_url: string | null;
   designation: string | null;
   is_active: boolean;
@@ -43,14 +44,29 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const [isLoading, setIsLoading] = useState(true);
 
   useEffect(() => {
-    // Initial session check
+    // Initial session check with 5s timeout safety net
     const initAuth = async () => {
-      try {
-        const { data: { session } } = await supabase.auth.getSession();
-        setSession(session);
-        if (session?.user) {
-          await fetchUserData(session.user.id);
+      const authPromise = (async () => {
+        try {
+          const { data: { session: currentSession } } = await supabase.auth.getSession();
+          setSession(currentSession);
+          if (currentSession?.user) {
+            await fetchUserData(currentSession.access_token);
+          }
+        } catch (error) {
+          console.error('Inner auth initialization error:', error);
         }
+      })();
+
+      const timeoutPromise = new Promise((resolve) => 
+        setTimeout(() => {
+          console.warn('Auth initialization timed out after 5s');
+          resolve(null);
+        }, 5000)
+      );
+
+      try {
+        await Promise.race([authPromise, timeoutPromise]);
       } catch (error) {
         console.error('Error initializing auth:', error);
       } finally {
@@ -61,10 +77,10 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     initAuth();
 
     // Listen for auth changes
-    const { data: { subscription } } = supabase.auth.onAuthStateChange(async (_event, session) => {
-      setSession(session);
-      if (session?.user) {
-        await fetchUserData(session.user.id);
+    const { data: { subscription } } = supabase.auth.onAuthStateChange(async (_event, currentSession) => {
+      setSession(currentSession);
+      if (currentSession?.user) {
+        await fetchUserData(currentSession.access_token);
       } else {
         setUser(null);
         setTenant(null);
@@ -75,29 +91,22 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     return () => subscription.unsubscribe();
   }, []);
 
-  const fetchUserData = async (authId: string) => {
+  const fetchUserData = async (token: string) => {
     try {
-      // Fetch user profile from public.users
-      const { data: userData, error: userError } = await supabase
-        .from('users')
-        .select('*')
-        .eq('auth_id', authId)
-        .single();
+      const res = await apiClient('/api/auth/me', {
+        headers: {
+          Authorization: `Bearer ${token}`
+        }
+      });
 
-      if (userError) throw userError;
-      setUser(userData);
+      if (!res.ok) throw new Error('Identity verification failed');
+      const result = await res.json();
+      
+      const userData = result.data?.user;
+      const tenantData = result.data?.tenant;
 
-      if (userData?.tenant_id) {
-        // Fetch tenant data
-        const { data: tenantData, error: tenantError } = await supabase
-          .from('tenants')
-          .select('*')
-          .eq('id', userData.tenant_id)
-          .single();
-
-        if (tenantError) throw tenantError;
-        setTenant(tenantData);
-      }
+      setUser(userData || null);
+      setTenant(tenantData || null);
     } catch (error) {
       console.error('Error fetching user data:', error);
     }

@@ -14,6 +14,8 @@ router.get('/', authenticate, requireStaff(), requireFeature('travel_insurance')
 
 router.post('/', authenticate, requireStaff(), requireWriteAccess, requireFeature('travel_insurance'), asyncHandler((req, res, next) => insuranceController.post__1(req, res, next)));;
 
+router.get('/:id', authenticate, requireStaff(), requireFeature('travel_insurance'), asyncHandler((req, res, next) => insuranceController.get_id(req, res, next)));;
+
 router.patch('/:id', authenticate, requireStaff(), requireWriteAccess, requireFeature('travel_insurance'), asyncHandler((req, res, next) => insuranceController.patch_id_2(req, res, next)));;
 
 router.delete('/:id', authenticate, requireStaff(), requireWriteAccess, requireFeature('travel_insurance'), asyncHandler((req, res, next) => insuranceController.delete_id_3(req, res, next)));;

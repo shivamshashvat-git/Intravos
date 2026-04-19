@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { supabase } from '@/core/lib/supabase';
+import { authService } from '../services/authService';
 
 export const LoginPage: React.FC = () => {
   const [email, setEmail] = useState('');
@@ -15,12 +16,16 @@ export const LoginPage: React.FC = () => {
     setError(null);
 
     try {
-      const { error: signInError } = await supabase.auth.signInWithPassword({
-        email: email.trim(),
-        password,
+      // 1. Authenticate via Express Backend (Industrialized Rule)
+      const data = await authService.login(email.trim(), password);
+
+      // 2. Synchronize Local Supabase Instance (for session management/hooks)
+      const { error: sessionError } = await supabase.auth.setSession({
+        access_token: data.access_token,
+        refresh_token: data.refresh_token,
       });
 
-      if (signInError) throw signInError;
+      if (sessionError) throw sessionError;
 
       navigate('/dashboard');
     } catch (err: any) {

@@ -31,8 +31,8 @@ export const KnowledgeBankPage: React.FC = () => {
   const [selectedTemplate, setSelectedTemplate] = useState<ItineraryTemplate | null>(null);
   const [editingTemplate, setEditingTemplate] = useState<ItineraryTemplate | null>(null);
 
-  const isAdmin = user?.role === 'admin' || user?.role === 'super_admin';
-  const isStaff = user?.role === 'staff' || isAdmin;
+  const isAdmin = ['admin', 'agency_admin', 'super_admin'].includes(user?.role || '');
+  const isStaff = user?.role === 'staff' || isAdmin || user?.role === 'secondary_admin';
 
   const stats = useMemo(() => {
     const destinations = new Set(templates.map(t => t.destination)).size;

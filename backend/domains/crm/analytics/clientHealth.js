@@ -1,6 +1,9 @@
-import { supabaseAdmin  } from '../../../providers/database/supabase.js';
+import { supabaseAdmin } from '../../../providers/database/supabase.js';
 
-function computeHealth(lastLoginAt, leadsThisWeek, actionsThisWeek) {
+/**
+ * Tenant Health Scoring (Agency Level)
+ */
+function computeTenantHealth(lastLoginAt, leadsThisWeek, actionsThisWeek) {
   if (!lastLoginAt) return 'red';
 
   const lastLogin = new Date(lastLoginAt);
@@ -41,7 +44,7 @@ async function refreshClientHealth(tenantId) {
 
   const lastLoginAt = users?.[0]?.last_login_at || null;
   const actionsThisWeek = (paymentsThisWeek || 0) + (quotationsThisWeek || 0) + (leadsThisWeek || 0);
-  const health = computeHealth(lastLoginAt, leadsThisWeek || 0, actionsThisWeek || 0);
+  const health = computeTenantHealth(lastLoginAt, leadsThisWeek || 0, actionsThisWeek || 0);
 
   const payload = {
     tenant_id: tenantId,
@@ -62,4 +65,47 @@ async function refreshClientHealth(tenantId) {
   return data;
 }
 
-export { refreshClientHealth  };
+/**
+ * Individual Customer Health Scoring
+ */
+async function refreshCustomerHealth(tenantId, customerId) {
+  const { data: customer } = await supabaseAdmin
+    .from('customers')
+    .select('total_bookings, last_booking_at, last_contacted_at')
+    .eq('id', customerId)
+    .eq('tenant_id', tenantId)
+    .single();
+
+  if (!customer) return null;
+
+  let score = 50; 
+  if (customer.last_booking_at) {
+    const months = (Date.now() - new Date(customer.last_booking_at).getTime()) / (1000 * 3600 * 24 * 30);
+    if (months <= 6) score += 30;
+    else if (months <= 12) score += 10;
+    else score -= 10;
+  }
+  if (customer.last_contacted_at) {
+    const months = (Date.now() - new Date(customer.last_contacted_at).getTime()) / (1000 * 3600 * 24 * 30);
+    if (months > 3) score -= 15;
+  }
+  if ((customer.total_bookings || 0) > 3) score += 20;
+
+  score = Math.max(0, Math.min(100, score));
+
+  const { data, error } = await supabaseAdmin
+    .from('customer_health_cache')
+    .upsert({
+      customer_id: customerId,
+      tenant_id: tenantId,
+      health_score: score,
+      updated_at: new Date().toISOString()
+    }, { onConflict: 'customer_id' })
+    .select()
+    .single();
+
+  if (error) throw error;
+  return data;
+}
+
+export { refreshClientHealth, refreshCustomerHealth };

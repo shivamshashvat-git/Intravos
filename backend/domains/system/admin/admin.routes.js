@@ -2,7 +2,7 @@ import adminController from './admin.controller.js';
 import express from 'express';
 import { supabaseAdmin  } from '../../../providers/database/supabase.js';
 import { authenticate  } from '../../../core/middleware/auth.js';
-import { requireSuperAdmin  } from '../../../core/middleware/rbac.js';
+import { requireSuperAdmin, requireWriteAccess  } from '../../../core/middleware/rbac.js';
 import { asyncHandler  } from '../../../core/middleware/errorHandler.js';
 import { logPlatformChange  } from '../announcements/changelog.js';
 import { refreshClientHealth  } from '../../crm/analytics/clientHealth.js';
@@ -11,8 +11,9 @@ const router = express.Router();
 
 function requireSuperAdminActor(req, res, next) {
   const actor = req.impersonator || req.user;
-  if (!actor || actor.role !== 'super_admin') {
-    return res.status(403).json({ error: 'Super admin access required' });
+  const platformRoles = ['super_admin', 'platform_manager', 'ivobot'];
+  if (!actor || !platformRoles.includes(actor.role)) {
+    return res.status(403).json({ error: 'Platform tier access required' });
   }
   next();
 }
@@ -31,7 +32,7 @@ router.get('/revenue-dashboard', asyncHandler((req, res, next) => adminControlle
 
 // ── PLATFORM SETTINGS ──
 router.get('/platform-settings', asyncHandler((req, res, next) => adminController.get_platform_settings_25(req, res, next)));;
-router.patch('/platform-settings', asyncHandler((req, res, next) => adminController.patch_platform_settings_26(req, res, next)));;
+router.patch('/platform-settings', requireWriteAccess, asyncHandler((req, res, next) => adminController.patch_platform_settings_26(req, res, next)));;
 
 // ── EXPIRING SOON ──
 
@@ -50,11 +51,11 @@ router.get('/changelog', asyncHandler((req, res, next) => adminController.get_ch
 
 router.get('/announcements', asyncHandler((req, res, next) => adminController.get_announcements_4(req, res, next)));;
 
-router.post('/announcements', asyncHandler((req, res, next) => adminController.post_announcements_5(req, res, next)));;
+router.post('/announcements', requireWriteAccess, asyncHandler((req, res, next) => adminController.post_announcements_5(req, res, next)));;
 
-router.patch('/announcements/:id', asyncHandler((req, res, next) => adminController.patch_announcements__id_6(req, res, next)));;
+router.patch('/announcements/:id', requireWriteAccess, asyncHandler((req, res, next) => adminController.patch_announcements__id_6(req, res, next)));;
 
-router.delete('/announcements/:id', asyncHandler((req, res, next) => adminController.delete_announcements__id_7(req, res, next)));;
+router.delete('/announcements/:id', requireWriteAccess, asyncHandler((req, res, next) => adminController.delete_announcements__id_7(req, res, next)));;
 
 router.get('/platform-payments', asyncHandler((req, res, next) => adminController.get_platform_payments_8(req, res, next)));;
 
@@ -110,6 +111,6 @@ router.patch('/referrals/:id', asyncHandler((req, res, next) => adminController.
 
 // ── TENANT LIFECYCLE CONTROLS ──
 router.post('/tenants/:id/grace', asyncHandler((req, res, next) => adminController.post_grant_grace_period(req, res, next)));
-router.delete('/tenants/:id', asyncHandler((req, res, next) => adminController.delete_offboard_tenant(req, res, next)));
+router.delete('/tenants/:id', requireWriteAccess, asyncHandler((req, res, next) => adminController.delete_offboard_tenant(req, res, next)));
 
 export default router;

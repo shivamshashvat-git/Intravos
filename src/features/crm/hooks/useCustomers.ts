@@ -17,32 +17,27 @@ export function useCustomers(initialFilters: CustomerFilters = {}) {
   });
 
   const fetchCustomers = useCallback(async () => {
-    if (!tenant?.id) return;
     setIsLoading(true);
     try {
-      const { data, count } = await customersService.getCustomers(tenant.id, filters, page);
+      const { data, total } = await customersService.getCustomers(filters, page);
       setCustomers(data);
-      setTotalCount(count);
+      setTotalCount(total);
 
-      // Fetch Stats
-      const now = new Date();
-      const thirtyDaysAgo = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000).toISOString();
-      
+      // Fetch Stats — Industrialized backend should ideally provide a /stats endpoint, 
+      // but for now we keep the parallel fetching logic using the new service interface.
       const [allRes, corporateRes] = await Promise.all([
-        customersService.getCustomers(tenant.id, {}),
-        customersService.getCustomers(tenant.id, { customer_type: 'corporate' })
+        customersService.getCustomers({}),
+        customersService.getCustomers({ customer_type: 'corporate' })
       ]);
-
-      // Note: Active This Month would ideally be a dedicated SQL count, 
-      // but for now we calculate from total results if small or just a placeholder logic.
-      // We will perform a specific query for activity if needed.
+      
+      const thirtyDaysAgo = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString();
       
       setStats({
-        total: allRes.count,
-        corporate: corporateRes.count,
+        total: allRes.total,
+        corporate: corporateRes.total,
         activeThisMonth: allRes.data.filter(c => 
-          (c.last_booking_at && c.last_booking_at > thirtyDaysAgo) || 
-          (c.last_contacted_at && c.last_contacted_at > thirtyDaysAgo)
+          (c.last_booking_at && (c.last_booking_at as any) > thirtyDaysAgo) || 
+          (c.last_contacted_at && (c.last_contacted_at as any) > thirtyDaysAgo)
         ).length
       });
     } catch (error) {
@@ -50,7 +45,7 @@ export function useCustomers(initialFilters: CustomerFilters = {}) {
     } finally {
       setIsLoading(false);
     }
-  }, [tenant?.id, filters, page]);
+  }, [filters, page]);
 
   useEffect(() => {
     fetchCustomers();

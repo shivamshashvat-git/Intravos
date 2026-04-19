@@ -19,7 +19,7 @@ export const QuotationsPage: React.FC = () => {
     summary, deleteQuotation 
   } = useQuotations();
 
-  const isAdmin = user?.role === 'admin' || user?.role === 'super_admin';
+  const isAdmin = ['admin', 'agency_admin', 'super_admin'].includes(user?.role || '');
 
   const statusTabs: { id: QuotationStatus | 'all'; label: string; color: string }[] = [
     { id: 'all', label: 'All', color: 'bg-slate-100 text-slate-600' },

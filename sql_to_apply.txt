@@ -1,0 +1,20 @@
+-- Tasks Table Alterations
+ALTER TABLE tasks ADD COLUMN IF NOT EXISTS created_by UUID REFERENCES users(id) ON DELETE SET NULL;
+ALTER TABLE tasks ADD COLUMN IF NOT EXISTS entity_type TEXT;
+ALTER TABLE tasks ADD COLUMN IF NOT EXISTS entity_id UUID;
+ALTER TABLE tasks ADD COLUMN IF NOT EXISTS customer_id UUID REFERENCES customers(id) ON DELETE CASCADE;
+ALTER TABLE tasks ADD COLUMN IF NOT EXISTS due_time TIME;
+ALTER TABLE tasks ADD COLUMN IF NOT EXISTS notified_overdue BOOLEAN DEFAULT false;
+
+-- Calendar Events Table Alterations
+ALTER TABLE calendar_events ADD COLUMN IF NOT EXISTS created_by UUID REFERENCES users(id) ON DELETE SET NULL;
+ALTER TABLE calendar_events ADD COLUMN IF NOT EXISTS entity_type TEXT;
+ALTER TABLE calendar_events ADD COLUMN IF NOT EXISTS entity_id UUID;
+ALTER TABLE calendar_events ADD COLUMN IF NOT EXISTS start_date DATE;
+ALTER TABLE calendar_events ADD COLUMN IF NOT EXISTS end_date DATE;
+ALTER TABLE calendar_events ADD COLUMN IF NOT EXISTS start_time TIME;
+ALTER TABLE calendar_events ADD COLUMN IF NOT EXISTS end_time TIME;
+ALTER TABLE calendar_events ADD COLUMN IF NOT EXISTS color_code TEXT;
+
+-- Drop obsolete columns if necessary, but to avoid breaking existing data immediately, we can just sync data or nullify.
+-- For tasks, if we keep lead_id and booking_id, we can still use them or map them to entity_type/id.

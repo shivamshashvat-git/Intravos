@@ -1,48 +1,76 @@
+
 import taskService from './tasks.service.js';
+import { taskSchema, updateTaskSchema, taskFiltersSchema } from './tasks.schema.js';
 import response from '../../../core/utils/responseHandler.js';
 
-/**
- * TasksController — Industrialized Workflow Orchestration
- */
-class TasksController {
-  
-  async get__0(req, res, next) {
+class TaskController {
+  async listTasks(req, res, next) {
     try {
-      const result = await taskService.listTasks(req.user.tenantId, req.query);
-      return response.success(res, result);
+      const filters = taskFiltersSchema.parse(req.query);
+      const data = await taskService.listTasks(req.user.tenantId, filters);
+      return response.success(res, data);
     } catch (error) {
       next(error);
     }
   }
 
-  async post__1(req, res, next) {
+  async createTask(req, res, next) {
     try {
-      const data = await taskService.createTask(req.user.tenantId, req.user.id, req.body);
-      return response.success(res, { task: data }, 'Actionable task assigned', 201);
+      const validated = taskSchema.parse(req.body);
+      const data = await taskService.createTask(req.user.tenantId, req.user.id, validated);
+      return response.success(res, data, 'Task created', 201);
+    } catch (error) {
+      if (error.name === 'ZodError') return response.error(res, error.errors[0]?.message, 400);
+      next(error);
+    }
+  }
+
+  async updateTask(req, res, next) {
+    try {
+      const validated = updateTaskSchema.parse(req.body);
+      const data = await taskService.updateTask(req.user.tenantId, req.params.id, validated);
+      return response.success(res, data, 'Task updated');
+    } catch (error) {
+      if (error.name === 'ZodError') return response.error(res, error.errors[0]?.message, 400);
+      next(error);
+    }
+  }
+
+  async completeTask(req, res, next) {
+    try {
+      const data = await taskService.completeTask(req.user.tenantId, req.params.id);
+      return response.success(res, data, 'Task completed');
     } catch (error) {
       next(error);
     }
   }
 
-  async patch_id_2(req, res, next) {
+  async deleteTask(req, res, next) {
     try {
-      const data = await taskService.updateTask(req.user.tenantId, req.params.id, req.body);
-      if (!data) return response.error(res, 'Task not found', 404);
-      return response.success(res, { task: data }, 'Task progress synchronized');
+      await taskService.deleteTask(req.user.tenantId, req.params.id, req.user);
+      return response.success(res, null, 'Task deleted');
     } catch (error) {
       next(error);
     }
   }
 
-  async delete_id_3(req, res, next) {
+  async getAnalytics(req, res, next) {
     try {
-      const result = await taskService.deleteTask(req.user.tenantId, req.user.id, req.params.id);
-      if (!result) return response.error(res, 'Task not found', 404);
-      return response.success(res, result, 'Task record retired');
+      const data = await taskService.getAnalytics(req.user.tenantId);
+      return response.success(res, data);
+    } catch (error) {
+      next(error);
+    }
+  }
+
+  async triggerOverdueCheck(req, res, next) {
+    try {
+      const count = await taskService.checkOverdueTasks();
+      return response.success(res, { processed_count: count }, 'Overdue check complete');
     } catch (error) {
       next(error);
     }
   }
 }
 
-export default new TasksController();
+export default new TaskController();

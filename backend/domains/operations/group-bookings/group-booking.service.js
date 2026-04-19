@@ -7,16 +7,146 @@ import invoiceService from '../../finance/invoices/invoice.service.js';
  */
 class GroupBookingService {
   /**
+   * List Group Bookings with financial aggregation
+   */
+  async listGroups(tenantId, filters = {}) {
+    let query = supabaseAdmin
+      .from('bookings')
+      .select('*, itineraries(title)')
+      .eq('tenant_id', tenantId)
+      .eq('is_group', true)
+      .is('deleted_at', null)
+      .order('created_at', { ascending: false });
+
+    if (filters.search) {
+      query = query.or(`title.ilike.%${filters.search}%,booking_ref.ilike.%${filters.search}%`);
+    }
+
+    const { data, error } = await query;
+    if (error) throw error;
+
+    // Aggregate stats for each group
+    const groups = await Promise.all((data || []).map(async (g) => {
+      const { data: members } = await supabaseAdmin
+        .from('group_booking_members')
+        .select('per_person_total, invoice_id')
+        .eq('booking_id', g.id)
+        .is('deleted_at', null);
+
+      const memberCount = (members || []).length;
+      const totalPax = (members || []).reduce((sum, m) => sum + (m.pax || 1), 0);
+      const totalValue = (members || []).reduce((sum, m) => sum + toAmount(m.per_person_total), 0);
+
+      return {
+        ...g,
+        group_name: g.title,
+        group_ref: g.booking_ref,
+        departure_date: g.travel_start_date || g.travel_date_start,
+        member_count: memberCount,
+        total_pax: totalPax,
+        financials: {
+           total_invoiced: totalValue,
+           total_paid: 0, // Simplified for now
+           total_outstanding: totalValue
+        }
+      };
+    }));
+
+    return groups;
+  }
+
+  /**
+   * Get exhaustive Group detail with member manifest
+   */
+  async getGroupDetail(tenantId, groupId) {
+    const { data: group, error } = await supabaseAdmin
+      .from('bookings')
+      .select('*, itineraries(title)')
+      .eq('id', groupId)
+      .eq('tenant_id', tenantId)
+      .is('deleted_at', null)
+      .single();
+
+    if (error || !group) throw new Error('Group not found');
+
+    const members = await this.getMembers(tenantId, groupId);
+
+    return {
+      ...group,
+      group_name: group.title,
+      group_ref: group.booking_ref,
+      departure_date: group.travel_start_date || group.travel_date_start,
+      members,
+      financials: {
+        total_invoiced: members.reduce((sum, m) => sum + toAmount(m.per_person_total), 0),
+        total_paid: 0,
+        total_outstanding: members.reduce((sum, m) => sum + toAmount(m.per_person_total), 0)
+      }
+    };
+  }
+
+  /**
+   * Initialize a new Group Operation
+   */
+  async createGroup(tenantId, userId, payload) {
+    const booking_ref = `GRP-${Date.now()}`;
+    const { data: group, error } = await supabaseAdmin
+      .from('bookings')
+      .insert({
+        tenant_id: tenantId,
+        created_by: userId,
+        booking_ref,
+        title: payload.group_name,
+        travel_start_date: payload.departure_date,
+        travel_end_date: payload.return_date,
+        itinerary_id: payload.itinerary_id,
+        status: 'confirmed',
+        is_group: true
+      })
+      .select()
+      .single();
+
+    if (error) throw error;
+
+    // Add initial members if provided
+    if (Array.isArray(payload.members) && payload.members.length > 0) {
+      for (const m of payload.members) {
+        await this.addMember(tenantId, group.id, {
+          member_name: m.name,
+          customer_id: m.id,
+          pax: m.pax || 1,
+          base_cost: 0
+        }, userId);
+      }
+    }
+
+    return group;
+  }
+
+  /**
+   * Detach member from Group
+   */
+  async removeMember(tenantId, bookingId, memberId) {
+    const { error } = await supabaseAdmin
+      .from('group_booking_members')
+      .update({ deleted_at: new Date().toISOString() })
+      .eq('id', memberId)
+      .eq('booking_id', bookingId)
+      .eq('tenant_id', tenantId);
+
+    if (error) throw error;
+  }
+
+  /**
    * List of members in a group booking
    */
-  async getMembers(tenantId, bookingId) {
+  async getBookingMembers(tenantId, bookingId) {
     const { data, error } = await supabaseAdmin
       .from('group_booking_members')
       .select('*')
       .eq('tenant_id', tenantId)
       .eq('booking_id', bookingId)
-      .is('deleted_at', null)
-      .order('created_at', { ascending: true });
+      .is('deleted_at', null);
 
     if (error) throw error;
     return data || [];
@@ -25,16 +155,20 @@ class GroupBookingService {
   /**
    * Add a new member with automatic total calculation
    */
-  async addMember(tenantId, userId, bookingId, payload) {
+  async addMember(tenantId, bookingId, payload, userId) {
+    // Industrial ID Resolution
+    const { data: userRec } = await supabaseAdmin.from('users').select('id').eq('auth_id', userId).single();
+    const actualUserId = userRec?.id || userId;
+
     const member = {
       tenant_id: tenantId,
       booking_id: bookingId,
-      member_name: payload.member_name,
+      member_name: payload.name || payload.member_name,
       room_sharing: payload.room_sharing || null,
       add_ons: Array.isArray(payload.add_ons) ? payload.add_ons : [],
       base_cost: toAmount(payload.base_cost),
       room_upgrade: toAmount(payload.room_upgrade),
-      created_by: userId
+      created_by: actualUserId
     };
 
     const totals = this._calculateMemberTotals(member);
@@ -112,38 +246,53 @@ class GroupBookingService {
   /**
    * Update member details with live financial recalculation
    */
-  async updateMember(tenantId, bookingId, memberId, payload) {
+  async updateMember(tenantId, memberId, payload) {
     const { data: current } = await supabaseAdmin
       .from('group_booking_members')
       .select('*')
       .eq('id', memberId)
-      .eq('booking_id', bookingId)
       .eq('tenant_id', tenantId)
       .single();
 
     if (!current) throw new Error('Group member not found');
 
     const updates = {
-      member_name: payload.member_name ?? current.member_name,
-      room_sharing: payload.room_sharing ?? current.room_sharing,
-      add_ons: Array.isArray(payload.add_ons) ? payload.add_ons : current.add_ons,
-      base_cost: payload.base_cost !== undefined ? toAmount(payload.base_cost) : toAmount(current.base_cost),
-      room_upgrade: payload.room_upgrade !== undefined ? toAmount(payload.room_upgrade) : toAmount(current.room_upgrade),
+      ...payload,
       updated_at: new Date().toISOString()
     };
 
-    const totals = this._calculateMemberTotals(updates);
-    Object.assign(updates, totals);
+    if (payload.base_cost !== undefined || payload.room_upgrade !== undefined || payload.add_ons) {
+        const base = payload.base_cost !== undefined ? toAmount(payload.base_cost) : toAmount(current.base_cost);
+        const upgrade = payload.room_upgrade !== undefined ? toAmount(payload.room_upgrade) : toAmount(current.room_upgrade);
+        const addOns = Array.isArray(payload.add_ons) ? payload.add_ons : current.add_ons;
+        
+        const totals = this._calculateMemberTotals({ base_cost: base, room_upgrade: upgrade, add_ons: addOns });
+        Object.assign(updates, totals);
+    }
 
     const { data, error } = await supabaseAdmin
       .from('group_booking_members')
       .update(updates)
       .eq('id', memberId)
+      .eq('tenant_id', tenantId)
       .select()
       .single();
 
     if (error) throw error;
     return data;
+  }
+
+  /**
+   * Standalone delete member
+   */
+  async deleteMember(tenantId, memberId) {
+    const { error } = await supabaseAdmin
+      .from('group_booking_members')
+      .update({ deleted_at: new Date().toISOString() })
+      .eq('id', memberId)
+      .eq('tenant_id', tenantId);
+
+    if (error) throw error;
   }
 
   // --- INTERNAL ---

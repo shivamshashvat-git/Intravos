@@ -1,5 +1,6 @@
 import { supabaseAdmin } from '../../../providers/database/supabase.js';
 import logger from '../../../core/utils/logger.js';
+import { generatePdf, fetchTenantBranding } from '../../../providers/pdf-engine/pdfEngine.js';
 
 /**
  * ItineraryService — Enterprise Itinerary Management
@@ -60,15 +61,77 @@ class ItineraryService {
     return itin;
   }
 
-  async createItinerary(tenantId, payload) {
-    const { data, error } = await supabaseAdmin
+  /**
+   * Fetch itinerary by Booking ID — Industrialized resolution via Lead
+   */
+  async getItineraryByBooking(tenantId, bookingId) {
+    // 1. Resolve Lead/Customer from Booking
+    const { data: booking } = await supabaseAdmin
+      .from('bookings')
+      .select('lead_id, customer_id')
+      .eq('id', bookingId)
+      .eq('tenant_id', tenantId)
+      .single();
+
+    if (!booking || !booking.lead_id) return null;
+
+    // 2. Resolve Itinerary linked to that lead
+    const { data: itin, error } = await supabaseAdmin
       .from('itineraries')
-      .insert({ ...payload, tenant_id: tenantId })
+      .select('*, itinerary_days(*, itinerary_items(*))')
+      .eq('lead_id', booking.lead_id)
+      .eq('tenant_id', tenantId)
+      .is('deleted_at', null)
+      .maybeSingle();
+
+    if (error) throw error;
+    if (!itin) return null;
+
+    if (itin.itinerary_days) {
+      itin.itinerary_days = itin.itinerary_days
+        .filter(day => !day.deleted_at)
+        .sort((a, b) => a.day_number - b.day_number);
+
+      itin.itinerary_days.forEach(day => {
+        if (day.itinerary_items) {
+          day.itinerary_items = day.itinerary_items
+            .filter(item => !item.deleted_at)
+            .sort((a, b) => a.sort_order - b.sort_order);
+        }
+      });
+    }
+
+    return itin;
+  }
+
+  async createItinerary(tenantId, payload) {
+    // If booking_id is passed but schema doesn't have it, resolve lead_id
+    const { booking_id, ...data } = payload;
+    let lead_id = data.lead_id;
+    let customer_id = data.customer_id;
+
+    if (booking_id && !lead_id) {
+      const { data: booking } = await supabaseAdmin
+        .from('bookings')
+        .select('lead_id, customer_id')
+        .eq('id', booking_id)
+        .eq('tenant_id', tenantId)
+        .single();
+      
+      if (booking) {
+        lead_id = booking.lead_id;
+        if (!customer_id) customer_id = booking.customer_id;
+      }
+    }
+
+    const { data: itinerary, error } = await supabaseAdmin
+      .from('itineraries')
+      .insert({ ...data, lead_id, customer_id, tenant_id: tenantId })
       .select()
       .single();
 
     if (error) throw error;
-    return data;
+    return itinerary;
   }
 
   async updateItinerary(tenantId, itineraryId, updates) {
@@ -89,6 +152,9 @@ class ItineraryService {
     const original = await this.getItineraryById(tenantId, itineraryId);
     if (!original) throw new Error('Itinerary not found');
 
+    const { data: userRec } = await supabaseAdmin.from('users').select('id').eq('auth_id', userId).single();
+    const actualUserId = userRec?.id || userId;
+
     const { id, created_at, updated_at, share_token, is_shared, itinerary_days, ...itinData } = original;
 
     const { data: copy, error } = await supabaseAdmin
@@ -97,7 +163,7 @@ class ItineraryService {
         ...itinData,
         title: `${itinData.title} (Copy)`,
         is_template: false,
-        created_by: userId
+        created_by: actualUserId
       })
       .select()
       .single();
@@ -159,7 +225,7 @@ class ItineraryService {
   async addDay(tenantId, itineraryId, payload) {
     const { data, error } = await supabaseAdmin
       .from('itinerary_days')
-      .insert({ ...payload, itinerary_id: itineraryId })
+      .insert({ ...payload, itinerary_id: itineraryId, tenant_id: tenantId })
       .select()
       .single();
 
@@ -194,7 +260,7 @@ class ItineraryService {
   async addItem(tenantId, dayId, payload) {
     const { data, error } = await supabaseAdmin
       .from('itinerary_items')
-      .insert({ ...payload, day_id: dayId })
+      .insert({ ...payload, day_id: dayId, tenant_id: tenantId })
       .select()
       .single();
 
@@ -244,6 +310,24 @@ class ItineraryService {
     return { success: true };
   }
 
+  /**
+   * Bulk synchronizes item sort order within a day
+   */
+  async reorderItems(tenantId, dayId, orderedIds) {
+    if (!Array.isArray(orderedIds)) throw new Error('orderedIds must be an array');
+
+    const updates = orderedIds.map((id, index) => 
+      supabaseAdmin
+        .from('itinerary_items')
+        .update({ sort_order: index })
+        .eq('id', id)
+        .eq('day_id', dayId)
+    );
+
+    await Promise.all(updates);
+    return { success: true };
+  }
+
   async loadTemplate(tenantId, itineraryId, templateId) {
     const template = await this.getItineraryById(tenantId, templateId);
     if (!template || !template.is_template) throw new Error('Valid template not found');
@@ -282,13 +366,16 @@ class ItineraryService {
     const original = await this.getItineraryById(tenantId, itineraryId);
     if (!original) throw new Error('Itinerary not found');
 
+    const { data: userRec } = await supabaseAdmin.from('users').select('id').eq('auth_id', userId).single();
+    const actualUserId = userRec?.id || userId;
+
     const { data: template, error } = await supabaseAdmin
       .from('itineraries')
       .insert({
         ...payload,
         is_template: true,
         tenant_id: tenantId,
-        created_by: userId
+        created_by: actualUserId
       })
       .select()
       .single();
@@ -317,6 +404,14 @@ class ItineraryService {
     }
     
     return template;
+  }
+
+  async generatePdf(tenantId, itineraryId) {
+    const itinerary = await this.getItineraryById(tenantId, itineraryId);
+    if (!itinerary) throw new Error('Itinerary not found');
+
+    const branding = await fetchTenantBranding(supabaseAdmin, tenantId);
+    return generatePdf('itinerary', itinerary, branding);
   }
 }
 

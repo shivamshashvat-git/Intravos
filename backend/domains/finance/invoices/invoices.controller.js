@@ -1,3 +1,4 @@
+import { invoiceSchema, updateInvoiceSchema } from './invoices.schema.js';
 import invoiceService from './invoice.service.js';
 import financialService from '../shared/financialService.js';
 import response from '../../../core/utils/responseHandler.js';
@@ -22,35 +23,6 @@ class InvoicesController {
   }
 
   /**
-   * Fetch aggregate GST liability data
-   */
-  async getGstSummary(req, res, next) {
-    try {
-      const { financial_year } = req.query;
-      const summary = await invoiceService.getGstSummary(req.user.tenantId, financial_year);
-      return response.success(res, { 
-        financial_year: financial_year || financialService.getCurrentFinancialYear(),
-        summary 
-      });
-    } catch (error) {
-      next(error);
-    }
-  }
-
-  /**
-   * Secure public view for customer
-   */
-  async getPublicInvoiceShare(req, res, next) {
-    try {
-      const result = await invoiceService.getPublicInvoiceShare(req.params.token);
-      if (!result) return response.error(res, 'Invoice not found', 404);
-      return response.success(res, result);
-    } catch (error) {
-      next(error);
-    }
-  }
-
-  /**
    * Fetch single invoice with items
    */
   async getInvoiceById(req, res, next) {
@@ -68,12 +40,53 @@ class InvoicesController {
    */
   async createInvoice(req, res, next) {
     try {
-      const invoice = await invoiceService.createInvoice(req.user.tenantId, req.user.id, req.body);
+      const validated = invoiceSchema.parse(req.body);
+      const invoice = await invoiceService.createInvoice(req.user.tenantId, req.user.id, validated);
       return response.success(res, { invoice }, 'Invoice created', 201);
+    } catch (error) {
+      if (error.name === 'ZodError') return response.error(res, error.errors[0]?.message, 400);
+      next(error);
+    }
+  }
+
+  /**
+   * Update invoice metadata or items
+   */
+  async updateInvoice(req, res, next) {
+    try {
+      const validated = updateInvoiceSchema.parse(req.body);
+      const invoice = await invoiceService.updateInvoice(req.user.tenantId, req.user.id, req.params.id, validated);
+      return response.success(res, { invoice }, 'Invoice updated successfully');
+    } catch (error) {
+      if (error.name === 'ZodError') return response.error(res, error.errors[0]?.message, 400);
+      next(error);
+    }
+  }
+
+  /**
+   * Soft-delete invoice
+   */
+  async deleteInvoice(req, res, next) {
+    try {
+      await invoiceService.deleteInvoice(req.user.tenantId, req.params.id);
+      return response.success(res, null, 'Invoice archived successfully');
     } catch (error) {
       next(error);
     }
   }
+
+  /**
+   * Recalculate invoice totals (Payments + Items)
+   */
+  async recalculateInvoice(req, res, next) {
+    try {
+      const invoice = await invoiceService.recalculate(req.user.tenantId, req.params.id);
+      return response.success(res, { invoice }, 'Invoice totals recalculated');
+    } catch (error) {
+      next(error);
+    }
+  }
+
 
   /**
    * Generate Invoice PDF
@@ -96,24 +109,16 @@ class InvoicesController {
   }
 
   /**
-   * Update invoice metadata (Status, Payment Note)
+   * Fetch aggregate GST liability data
    */
-  async updateInvoice(req, res, next) {
+  async getGstSummary(req, res, next) {
     try {
-      const invoice = await invoiceService.updateInvoice(req.user.tenantId, req.params.id, req.body);
-      return response.success(res, { invoice }, 'Invoice updated');
-    } catch (error) {
-      next(error);
-    }
-  }
-
-  /**
-   * Archive / Void invoice
-   */
-  async deleteInvoice(req, res, next) {
-    try {
-      await invoiceService.deleteInvoice(req.user.tenantId, req.params.id);
-      return response.success(res, null, 'Invoice removed from records');
+      const { financial_year } = req.query;
+      const summary = await invoiceService.getGstSummary(req.user.tenantId, financial_year);
+      return response.success(res, { 
+        financial_year: financial_year || financialService.getCurrentFinancialYear(),
+        summary 
+      });
     } catch (error) {
       next(error);
     }
@@ -144,42 +149,6 @@ class InvoicesController {
     } catch (error) {
       next(error);
     }
-  }
-
-  /**
-   * Issue Credit Note for an existing invoice
-   */
-  async createCreditNote(req, res, next) {
-    try {
-      const creditNote = await invoiceService.createCreditNote(req.user.tenantId, req.user.id, req.params.id, req.body);
-      return response.success(res, creditNote, 'Credit Note issued successfully', 201);
-    } catch (error) {
-      next(error);
-    }
-  }
-
-  /**
-   * Stubs for non-persistence logic referred to in routes
-   */
-  async getInvoiceAuditTrail(req, res, next) {
-    return response.error(res, 'Audit trail logic not yet ported to industrialized controller', 501);
-  }
-
-  async getInvoicePdfData(req, res, next) {
-    try {
-      const invoice = await invoiceService.getById(req.user.tenantId, req.params.id);
-      if (!invoice) return response.error(res, 'Invoice not found', 404);
-      return response.success(res, { invoice });
-    } catch (error) {
-      next(error);
-    }
-  }
-
-  async createPaymentLink(req, res, next) {
-    try {
-      const link = await invoiceService.createPaymentLink(req.user.tenantId, req.params.id);
-      return response.success(res, { payment_link_url: link });
-    } catch (error) { next(error); }
   }
 }
 

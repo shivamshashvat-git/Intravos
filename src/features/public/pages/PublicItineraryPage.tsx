@@ -19,8 +19,9 @@ export const PublicItineraryPage: React.FC = () => {
   const fetchPublicData = async () => {
     if (!share_token) return;
     try {
-      const res = await apiClient.get('/api/public/trip/' + share_token);
-      setData(res.data);
+      const res = await apiClient('/api/public/trip/' + share_token);
+      const result = await res.json();
+      setData(result.data);
     } catch (e) {
       console.error(e);
     } finally {
@@ -35,11 +36,11 @@ export const PublicItineraryPage: React.FC = () => {
   const handleApprove = async () => {
     setIsActionLoading(true);
     try {
-      await apiClient.post(`/api/public/trip/${share_token}/approve`);
+      await apiClient(`/api/public/trip/${share_token}/approve`, { method: 'POST' });
       toast.success('Proposal Approved successfully!');
       await fetchPublicData();
     } catch (e: any) {
-      toast.error(e.response?.data?.message || 'Action failed');
+      toast.error(e.message || 'Action failed');
     } finally {
       setIsActionLoading(false);
     }
@@ -50,10 +51,14 @@ export const PublicItineraryPage: React.FC = () => {
      if (!note) return;
      setIsActionLoading(true);
      try {
-       await apiClient.post(`/api/public/trip/${share_token}/request-changes`, { note });
+       await apiClient(`/api/public/trip/${share_token}/request-changes`, { 
+         method: 'POST',
+         headers: { 'Content-Type': 'application/json' },
+         body: JSON.stringify({ note }) 
+       });
        toast.success('Change request sent to your agency.');
      } catch (e: any) {
-       toast.error(e.response?.data?.message || 'Action failed');
+       toast.error(e.message || 'Action failed');
      } finally {
        setIsActionLoading(false);
      }

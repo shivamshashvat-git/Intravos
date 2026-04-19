@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { 
   X, Save, Upload, Info, ShieldCheck, 
-  MapPin, Clock, Banknote, HelpCircle, Zap
+  MapPin, Clock, Banknote, HelpCircle, Zap, RefreshCw
 } from 'lucide-react';
 import { 
   CATEGORY_LABELS, TemplateCategory, CreateTemplateInput, CATEGORY_COLORS 

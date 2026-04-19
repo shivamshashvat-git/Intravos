@@ -1,5 +1,5 @@
 import React from 'react';
-import { Link, useNavigate } from 'react-router-dom';
+import { Link, useNavigate, useSearchParams } from 'react-router-dom';
 import { 
   Plus, Search, Calendar, Users, MapPin, 
   Clock, AlertTriangle, CheckCircle, XCircle, 
@@ -11,6 +11,7 @@ import { formatINR } from '@/utils/currency';
 import { timeAgo } from '@/utils/time';
 import { clsx } from 'clsx';
 import { BookingStatus, BookingPriority } from '../types/booking';
+import { GroupBookingsPage } from './GroupBookingsPage';
 
 export const BookingsPage: React.FC = () => {
   const navigate = useNavigate();
@@ -19,14 +20,17 @@ export const BookingsPage: React.FC = () => {
     bookings, isLoading, filters, setFilters, 
     stats, refresh 
   } = useBookings();
+  const [searchParams, setSearchParams] = useSearchParams();
+  const currentTab = searchParams.get('tab') || 'all';
 
-  const statusTabs: { id: BookingStatus | 'all'; label: string }[] = [
+  const statusTabs: { id: BookingStatus | 'all' | 'groups'; label: string }[] = [
     { id: 'all', label: 'Fleet Node' },
     { id: 'confirmed', label: 'Confirmed' },
     { id: 'in_progress', label: 'Active' },
     { id: 'completed', label: 'Completed' },
     { id: 'cancelled', label: 'Cancelled' },
     { id: 'on_hold', label: 'Suspended' },
+    { id: 'groups', label: 'Groups' },
   ];
 
   const today = new Date().toISOString().split('T')[0];
@@ -78,10 +82,17 @@ export const BookingsPage: React.FC = () => {
             {statusTabs.map(tab => (
               <button
                 key={tab.id}
-                onClick={() => setFilters({ ...filters, status: tab.id })}
+                onClick={() => {
+                   if (tab.id === 'groups') {
+                     setSearchParams({ tab: 'groups' });
+                   } else {
+                     setSearchParams({});
+                     setFilters({ ...filters, status: tab.id });
+                   }
+                }}
                 className={clsx(
                   "px-6 py-2 rounded-xl text-[10px] font-black uppercase italic transition-all whitespace-nowrap border border-transparent",
-                  filters.status === tab.id ? "bg-white text-slate-900 shadow-sm border-slate-200" : "text-slate-400 hover:text-slate-600"
+                  ((currentTab === 'groups' && tab.id === 'groups') || (currentTab !== 'groups' && filters.status === tab.id)) ? "bg-white text-slate-900 shadow-sm border-slate-200" : "text-slate-400 hover:text-slate-600"
                 )}
               >
                 {tab.label}
@@ -104,65 +115,70 @@ export const BookingsPage: React.FC = () => {
         </div>
 
         {/* Table */}
-        <div className="overflow-hidden rounded-[2rem] border border-slate-100">
-          <table className="w-full text-left">
-            <thead className="bg-slate-50/50">
-              <tr>
-                <th className="py-4 px-6 text-[10px] font-black uppercase text-slate-400 tracking-widest">Log Node</th>
-                <th className="py-4 px-6 text-[10px] font-black uppercase text-slate-400 tracking-widest text-center">Protocol Identity</th>
-                <th className="py-4 px-6 text-[10px] font-black uppercase text-slate-400 tracking-widest text-center">Chrono Frame</th>
-                <th className="py-4 px-6 text-[10px] font-black uppercase text-slate-400 tracking-widest text-center">Status NODE</th>
-                <th className="py-4 px-6 text-[10px] font-black uppercase text-slate-400 tracking-widest text-center">Priority</th>
-                <th className="py-4 px-6 text-[10px] font-black uppercase text-slate-400 tracking-widest text-right">Value Node</th>
-                <th className="py-4 px-6 text-[10px] font-black uppercase text-slate-400 tracking-widest text-right">Actions</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-slate-50 italic">
-              {isLoading ? Array.from({ length: 5 }).map((_, i) => <SkeletonRow key={i} />) : 
-                bookings.length === 0 ? <EmptyState /> :
-                bookings.map(bk => (
-                <tr key={bk.id} className={clsx(
-                  "hover:bg-slate-50/50 transition-all group",
-                  bk.travel_date_start === today && "bg-rose-50/30"
-                )}>
-                  <td className="py-6 px-6">
-                    <p className="text-[10px] font-mono font-black text-indigo-600 mb-0.5">{bk.booking_number}</p>
-                    <p className="text-[8px] font-bold text-slate-400 uppercase tracking-tighter italic">Mission Core Connected</p>
-                  </td>
-                  <td className="py-6 px-6 text-center">
-                    <p className="text-sm font-black uppercase text-slate-900 leading-none mb-1">{bk.title}</p>
-                    <p className="text-[10px] font-bold text-slate-400 tracking-tight italic flex items-center justify-center gap-1.5 uppercase">
-                       <MapPin className="w-3 h-3" /> {bk.destination} • {bk.customer?.name}
-                    </p>
-                  </td>
-                  <td className="py-6 px-6 text-center">
-                    <div className="inline-flex flex-col items-center">
-                       <p className="text-[10px] font-black text-slate-900 mb-1">{new Date(bk.travel_date_start).toLocaleDateString('en-IN', { day: '2-digit', month: 'short' })} – {new Date(bk.travel_date_end).toLocaleDateString('en-IN', { day: '2-digit', month: 'short' })}</p>
-                       <DepartureStatus travelDate={bk.travel_date_start} />
-                    </div>
-                  </td>
-                  <td className="py-6 px-6 text-center">
-                    <StatusBadge status={bk.status} />
-                  </td>
-                  <td className="py-6 px-6 text-center">
-                    <PriorityBadge priority={bk.priority} />
-                  </td>
-                  <td className="py-6 px-6 text-right">
-                    <div className="space-y-1">
-                       <p className="text-xs font-black text-slate-900">{formatINR(bk.selling_price)}</p>
-                       <p className={clsx("text-[9px] font-black italic", bk.amount_outstanding > 0 ? "text-rose-600" : "text-emerald-500")}>Outstanding: {formatINR(bk.amount_outstanding)}</p>
-                    </div>
-                  </td>
-                  <td className="py-6 px-6 text-right">
-                    <div className="flex justify-end gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
-                      <Link to={`/bookings/${bk.id}`} className="p-2.5 bg-slate-50 text-slate-400 hover:text-indigo-600 hover:bg-white border border-transparent hover:border-indigo-100 rounded-xl transition-all shadow-sm"><Eye className="w-4 h-4" /></Link>
-                    </div>
-                  </td>
+        {currentTab === 'groups' ? (
+          <GroupBookingsPage />
+        ) : (
+          <div className="overflow-hidden rounded-[2rem] border border-slate-100">
+            <table className="w-full text-left">
+              {/* ... existing table code ... */}
+              <thead className="bg-slate-50/50">
+                <tr>
+                  <th className="py-4 px-6 text-[10px] font-black uppercase text-slate-400 tracking-widest">Log Node</th>
+                  <th className="py-4 px-6 text-[10px] font-black uppercase text-slate-400 tracking-widest text-center">Protocol Identity</th>
+                  <th className="py-4 px-6 text-[10px] font-black uppercase text-slate-400 tracking-widest text-center">Chrono Frame</th>
+                  <th className="py-4 px-6 text-[10px] font-black uppercase text-slate-400 tracking-widest text-center">Status NODE</th>
+                  <th className="py-4 px-6 text-[10px] font-black uppercase text-slate-400 tracking-widest text-center">Priority</th>
+                  <th className="py-4 px-6 text-[10px] font-black uppercase text-slate-400 tracking-widest text-right">Value Node</th>
+                  <th className="py-4 px-6 text-[10px] font-black uppercase text-slate-400 tracking-widest text-right">Actions</th>
                 </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
+              </thead>
+              <tbody className="divide-y divide-slate-50 italic">
+                {isLoading ? Array.from({ length: 5 }).map((_, i) => <SkeletonRow key={i} />) : 
+                  bookings.length === 0 ? <EmptyState /> :
+                  bookings.map(bk => (
+                  <tr key={bk.id} className={clsx(
+                    "hover:bg-slate-50/50 transition-all group",
+                    bk.travel_date_start === today && "bg-rose-50/30"
+                  )}>
+                    <td className="py-6 px-6">
+                      <p className="text-[10px] font-mono font-black text-indigo-600 mb-0.5">{bk.booking_number}</p>
+                      <p className="text-[8px] font-bold text-slate-400 uppercase tracking-tighter italic">Mission Core Connected</p>
+                    </td>
+                    <td className="py-6 px-6 text-center">
+                      <p className="text-sm font-black uppercase text-slate-900 leading-none mb-1">{bk.title}</p>
+                      <p className="text-[10px] font-bold text-slate-400 tracking-tight italic flex items-center justify-center gap-1.5 uppercase">
+                         <MapPin className="w-3 h-3" /> {bk.destination} • {bk.customer?.name}
+                      </p>
+                    </td>
+                    <td className="py-6 px-6 text-center">
+                      <div className="inline-flex flex-col items-center">
+                         <p className="text-[10px] font-black text-slate-900 mb-1">{new Date(bk.travel_date_start).toLocaleDateString('en-IN', { day: '2-digit', month: 'short' })} – {new Date(bk.travel_date_end).toLocaleDateString('en-IN', { day: '2-digit', month: 'short' })}</p>
+                         <DepartureStatus travelDate={bk.travel_date_start} />
+                      </div>
+                    </td>
+                    <td className="py-6 px-6 text-center">
+                      <StatusBadge status={bk.status} />
+                    </td>
+                    <td className="py-6 px-6 text-center">
+                      <PriorityBadge priority={bk.priority} />
+                    </td>
+                    <td className="py-6 px-6 text-right">
+                      <div className="space-y-1">
+                         <p className="text-xs font-black text-slate-900">{formatINR(bk.selling_price)}</p>
+                         <p className={clsx("text-[9px] font-black italic", bk.amount_outstanding > 0 ? "text-rose-600" : "text-emerald-500")}>Outstanding: {formatINR(bk.amount_outstanding)}</p>
+                      </div>
+                    </td>
+                    <td className="py-6 px-6 text-right">
+                      <div className="flex justify-end gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
+                        <Link to={`/bookings/${bk.id}`} className="p-2.5 bg-slate-50 text-slate-400 hover:text-indigo-600 hover:bg-white border border-transparent hover:border-indigo-100 rounded-xl transition-all shadow-sm"><Eye className="w-4 h-4" /></Link>
+                      </div>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
       </div>
     </div>
   );

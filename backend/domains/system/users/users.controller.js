@@ -1,73 +1,73 @@
-import userService from './user.service.js';
+import usersService from './users.service.js';
 import response from '../../../core/utils/responseHandler.js';
+import { userInviteSchema, userUpdateSchema, meUpdateSchema } from './users.schema.js';
 
-/**
- * UsersController — Industrialized Identity Orchestration
- */
 class UsersController {
-  
-  async get__0(req, res, next) {
+  async getMe(req, res, next) {
     try {
-      const data = await userService.listUsers(req.user.role, req.user.tenantId);
-      return response.success(res, { users: data });
-    } catch (error) {
-      next(error);
-    }
-  }
-
-  async get_me_summary_1(req, res, next) {
-    try {
-      const data = await userService.getProfile(req.user.id, req.tenant);
+      const data = await usersService.getMe(req.user.id);
       return response.success(res, data);
     } catch (error) {
-      if (error.message.includes('not found')) return response.error(res, error.message, 404);
       next(error);
     }
   }
 
-  async post__2(req, res, next) {
+  async updateMe(req, res, next) {
     try {
-      const data = await userService.provisionUser(req.user, req.body);
-      return response.success(res, data, 'User provisioned successfully', 201);
+      const validated = meUpdateSchema.parse(req.body);
+      const data = await usersService.updateMe(req.user.id, validated);
+      return response.success(res, data, 'Profile updated successfully');
     } catch (error) {
-      if (error.message.includes('required')) return response.error(res, error.message, 400);
-      if (error.message.includes('Cannot assign')) return response.error(res, error.message, 403);
-      if (error.message.includes('Seat limit')) return response.error(res, error.message, 403);
+      if (error.name === 'ZodError') return response.error(res, error.errors[0]?.message, 400);
       next(error);
     }
   }
 
-  async patch_id_3(req, res, next) {
+  async listTeam(req, res, next) {
     try {
-      const data = await userService.updateUser(req.user, req.params.id, req.body);
-      return response.success(res, { user: data }, 'Profile updated');
+      const data = await usersService.listTeam(req.user.tenantId);
+      return response.success(res, data);
     } catch (error) {
-      if (error.message.includes('Cannot assign')) return response.error(res, error.message, 403);
-      if (error.message.includes('not found')) return response.error(res, error.message, 404);
       next(error);
     }
   }
 
-  async patch_id_features_4(req, res, next) {
+  async inviteUser(req, res, next) {
     try {
-      const data = await userService.manageFeatures(req.user, req.params.id, req.body.features);
-      return response.success(res, { user: data }, `Features updated for ${data.name}`);
+      const validated = userInviteSchema.parse(req.body);
+      const data = await usersService.inviteUser(req.user.tenantId, req.user.id, validated);
+      return response.success(res, data, 'User invited successfully', 201);
     } catch (error) {
-      if (error.message.includes('permissions required')) return response.error(res, error.message, 403);
-      if (error.message.includes('must be an array')) return response.error(res, error.message, 400);
-      if (error.message.includes('not found')) return response.error(res, error.message, 404);
+      if (error.name === 'ZodError') return response.error(res, error.errors[0]?.message, 400);
       next(error);
     }
   }
 
-  async patch_id_network_access_5(req, res, next) {
+  async updateUser(req, res, next) {
     try {
-      const data = await userService.manageNetworkAccess(req.user, req.params.id, req.body.network_access);
-      return response.success(res, { user: data }, `Network access ${data.network_access ? 'granted' : 'revoked'}`);
+      const validated = userUpdateSchema.parse(req.body);
+      const data = await usersService.updateUser(req.user.tenantId, req.params.userId, validated, req.user);
+      return response.success(res, data, 'User updated successfully');
     } catch (error) {
-      if (error.message.includes('permissions required')) return response.error(res, error.message, 403);
-      if (error.message.includes('must be a boolean')) return response.error(res, error.message, 400);
-      if (error.message.includes('not found')) return response.error(res, error.message, 404);
+      if (error.name === 'ZodError') return response.error(res, error.errors[0]?.message, 400);
+      next(error);
+    }
+  }
+
+  async deactivateUser(req, res, next) {
+    try {
+      await usersService.deactivateUser(req.user.tenantId, req.params.userId, req.user.id);
+      return response.success(res, null, 'User deactivated successfully');
+    } catch (error) {
+      next(error);
+    }
+  }
+
+  async reactivateUser(req, res, next) {
+    try {
+      await usersService.reactivateUser(req.user.tenantId, req.params.userId, req.user.id);
+      return response.success(res, null, 'User reactivated successfully');
+    } catch (error) {
       next(error);
     }
   }

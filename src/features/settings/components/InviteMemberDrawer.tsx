@@ -72,24 +72,28 @@ export const InviteMemberDrawer: React.FC<InviteMemberDrawerProps> = ({ isOpen, 
                    <h3 className="text-[10px] font-black uppercase text-indigo-600 tracking-widest flex items-center gap-2">
                       <Shield className="w-4 h-4" /> Privilege Logic
                    </h3>
-                   <div className="grid grid-cols-1 gap-4">
-                      {['staff', 'admin', 'partner'].map(role => (
-                        <label key={role} className={clsx(
-                          "flex items-center justify-between p-4 border rounded-2xl cursor-pointer transition-all",
-                          formData.role === role ? "border-indigo-600 bg-indigo-50/50" : "border-slate-100 hover:bg-slate-50"
-                        )}>
-                           <div className="flex items-center gap-3">
-                              <input type="radio" name="role" className="accent-indigo-600" checked={formData.role === role} onChange={() => setFormData({...formData, role})} />
-                              <div>
-                                 <p className="text-xs font-black uppercase italic text-slate-900 leading-none mb-1">{role} Node</p>
-                                 <p className="text-[9px] text-slate-400 font-bold uppercase leading-none tracking-tighter">
-                                    {role === 'admin' ? 'Total Parameter Control' : role === 'partner' ? 'Lead Generation focus' : 'Operational execution'}
-                                 </p>
-                              </div>
-                           </div>
-                        </label>
-                      ))}
-                   </div>
+                    <div className="grid grid-cols-1 gap-4">
+                       {[
+                         { id: 'agency_admin', label: 'Agency Admin', desc: 'Full Parameter & Financial Control' },
+                         { id: 'secondary_admin', label: 'Secondary Admin', desc: 'Operational Management & Team Oversight' },
+                         { id: 'staff', label: 'Operational Staff', desc: 'Execution & Service Fulfillment' }
+                       ].map(role => (
+                         <label key={role.id} className={clsx(
+                           "flex items-center justify-between p-4 border rounded-2xl cursor-pointer transition-all",
+                           formData.role === role.id ? "border-indigo-600 bg-indigo-50/50" : "border-slate-100 hover:bg-slate-50"
+                         )}>
+                            <div className="flex items-center gap-3">
+                               <input type="radio" name="role" className="accent-indigo-600" checked={formData.role === role.id} onChange={() => setFormData({...formData, role: role.id})} />
+                               <div>
+                                  <p className="text-xs font-black uppercase italic text-slate-900 leading-none mb-1">{role.label} Node</p>
+                                  <p className="text-[9px] text-slate-400 font-bold uppercase leading-none tracking-tighter">
+                                     {role.desc}
+                                  </p>
+                               </div>
+                            </div>
+                         </label>
+                       ))}
+                    </div>
                 </section>
              </div>
 

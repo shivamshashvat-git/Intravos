@@ -1,182 +1,138 @@
-import { supabase } from '@/core/lib/supabase';
+
+import { apiClient } from '@/core/lib/apiClient';
 import { Booking, BookingService, GroupMember, BookingStatus, BookingFilters } from '../types/booking';
 
 export const bookingsService = {
   async getBookings(tenantId: string, filters?: BookingFilters) {
-    let query = supabase
-      .from('bookings')
-      .select('*, customer:customers(name)')
-      .eq('tenant_id', tenantId)
-      .is('deleted_at', null);
+    const params = new URLSearchParams();
+    if (filters?.status && filters.status !== 'all') params.append('status', filters.status);
+    if (filters?.customer_id) params.append('customer_id', filters.customer_id);
+    if (filters?.search) params.append('search', filters.search);
 
-    if (filters) {
-      if (filters.status && filters.status !== 'all') query = query.eq('status', filters.status);
-      if (filters.priority && filters.priority !== 'all') query = query.eq('priority', filters.priority);
-      if (filters.customer_id) query = query.eq('customer_id', filters.customer_id);
-      if (filters.search) {
-        query = query.or(`title.ilike.%${filters.search}%,booking_number.ilike.%${filters.search}%,destination.ilike.%${filters.search}%`);
-      }
-      if (filters.upcoming) {
-        query = query.gte('travel_date_start', new Date().toISOString().split('T')[0]);
-      }
-      if (filters.departing_soon) {
-        const today = new Date().toISOString().split('T')[0];
-        const nextWeek = new Date(Date.now() + 7 * 86400000).toISOString().split('T')[0];
-        query = query.gte('travel_date_start', today).lte('travel_date_start', nextWeek);
-      }
-    }
-
-    const { data, error } = await query.order('travel_date_start', { ascending: true });
-    if (error) throw error;
-    return data as Booking[];
+    const res = await apiClient(`/api/operations/bookings?${params.toString()}`);
+    if (!res.ok) throw new Error('Failed to fetch bookings');
+    const result = await res.json();
+    return result.data?.bookings || result.data as Booking[];
   },
 
-  async getBookingById(id: string, tenantId: string) {
-    // Use RPC if possible, otherwise manual fetch
-    const { data: hub, error: rpcError } = await supabase.rpc('get_booking_hub', {
-      p_tenant_id: tenantId,
-      p_booking_id: id
+  async getBookingHub(id: string) {
+    const res = await apiClient(`/api/operations/bookings/${id}/hub`);
+    if (!res.ok) throw new Error('Failed to fetch booking hub');
+    const result = await res.json();
+    return result.data?.hub;
+  },
+
+  async getBookingHubAnalytics() {
+    const res = await apiClient(`/api/operations/bookings/hub-analytics`);
+    if (!res.ok) throw new Error('Failed to fetch hub analytics');
+    const result = await res.json();
+    return result.data?.analytics;
+  },
+
+  async createBooking(payload: any) {
+    const res = await apiClient(`/api/operations/bookings`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload)
     });
-
-    if (rpcError) {
-      console.warn('RPC hub failed, falling back to manual fetch', rpcError);
-    }
-
-    const { data: booking, error: bError } = await supabase
-      .from('bookings')
-      .select(`
-        *,
-        customer:customers(*),
-        invoice:invoices(id, invoice_number, status, total_amount, amount_outstanding),
-        quotation:quotations(id, quote_number),
-        services:booking_services(*),
-        members:group_booking_members(*),
-        itinerary:itineraries(id, title, status, is_public, start_date)
-      `)
-      .eq('id', id)
-      .is('deleted_at', null)
-      .single();
-
-    if (bError) throw bError;
-    
-    // Sort services and members
-    if (booking.services) booking.services.sort((a: any, b: any) => a.sort_order - b.sort_order);
-    if (booking.members) booking.members.sort((a: any, b: any) => a.sort_order - b.sort_order);
-    
-    return booking as Booking;
-  },
-
-  async createBooking(data: Partial<Booking>, services?: Partial<BookingService>[]) {
-    const tenantId = data.tenant_id;
-    if (!tenantId) throw new Error('Tenant ID required');
-
-    // 1. Generate Booking Number
-    const { count } = await supabase
-      .from('bookings')
-      .select('*', { count: 'exact', head: true })
-      .eq('tenant_id', tenantId);
-    
-    const year = new Date().getFullYear();
-    const sequence = String((count || 0) + 1).padStart(4, '0');
-    const bookingNumber = `BK-${year}-${sequence}`;
-
-    const totalPax = (data.pax_adults || 0) + (data.pax_children || 0) + (data.pax_infants || 0);
-
-    const { data: booking, error: bError } = await supabase
-      .from('bookings')
-      .insert({
-        ...data,
-        booking_number: bookingNumber,
-        total_pax: totalPax,
-        confirmed_at: new Date().toISOString()
-      })
-      .select()
-      .single();
-
-    if (bError) throw bError;
-
-    if (services && services.length > 0) {
-      const { error: sError } = await supabase
-        .from('booking_services')
-        .insert(services.map((s, i) => ({
-          ...s,
-          booking_id: booking.id,
-          tenant_id: tenantId,
-          sort_order: i
-        })));
-      if (sError) throw sError;
-    }
-
-    return booking as Booking;
+    if (!res.ok) throw new Error('Failed to create booking');
+    const result = await res.json();
+    return result.data?.booking as Booking;
   },
 
   async updateBooking(id: string, updates: Partial<Booking>) {
-    if (updates.pax_adults !== undefined || updates.pax_children !== undefined || updates.pax_infants !== undefined) {
-      const { data: current } = await supabase.from('bookings').select('*').eq('id', id).single();
-      const a = updates.pax_adults ?? current.pax_adults;
-      const c = updates.pax_children ?? current.pax_children;
-      const i = updates.pax_infants ?? current.pax_infants;
-      updates.total_pax = a + c + i;
-    }
-
-    if (updates.selling_price !== undefined || updates.cost_price !== undefined) {
-      const { data: current } = await supabase.from('bookings').select('*').eq('id', id).single();
-      const s = updates.selling_price ?? current.selling_price;
-      const c = updates.cost_price ?? current.cost_price;
-      updates.profit = s - c;
-      updates.margin_percentage = s > 0 ? (updates.profit / s) * 100 : 0;
-    }
-
-    const { error } = await supabase.from('bookings').update(updates).eq('id', id);
-    if (error) throw error;
-  },
-
-  async updateStatus(id: string, status: BookingStatus, reason?: string) {
-    const updates: any = { status, updated_at: new Date().toISOString() };
-    if (status === 'completed') updates.completed_at = new Date().toISOString();
-    if (status === 'cancelled') {
-        updates.cancelled_at = new Date().toISOString();
-        if (reason) updates.cancellation_reason = reason;
-    }
-
-    const { error } = await supabase.from('bookings').update(updates).eq('id', id);
-    if (error) throw error;
-  },
-
-  async addService(bookingId: string, tenantId: string, service: Partial<BookingService>) {
-    const { error } = await supabase.from('booking_services').insert({
-      ...service,
-      booking_id: bookingId,
-      tenant_id: tenantId
+    const res = await apiClient(`/api/operations/bookings/${id}`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(updates)
     });
-    if (error) throw error;
-  },
-
-  async deleteService(id: string) {
-    const { error } = await supabase.from('booking_services').delete().eq('id', id);
-    if (error) throw error;
-  },
-
-  async addMember(bookingId: string, tenantId: string, member: Partial<GroupMember>) {
-    const { error } = await supabase.from('group_booking_members').insert({
-      ...member,
-      booking_id: bookingId,
-      tenant_id: tenantId
-    });
-    if (error) throw error;
-  },
-
-  async deleteMember(id: string) {
-    const { error } = await supabase.from('group_booking_members').delete().eq('id', id);
-    if (error) throw error;
+    if (!res.ok) throw new Error('Failed to update booking');
+    return (await res.json()).data?.booking;
   },
 
   async deleteBooking(id: string) {
-    const { data: b } = await supabase.from('bookings').select('status, invoice_id').eq('id', id).single();
-    if (b && b.status !== 'cancelled' && b.invoice_id) {
-       throw new Error('Cannot delete a booking with a linked invoice. Cancel it instead.');
-    }
-    const { error } = await supabase.from('bookings').update({ deleted_at: new Date().toISOString() }).eq('id', id);
-    if (error) throw error;
+    const res = await apiClient(`/api/operations/bookings/${id}`, {
+      method: 'DELETE'
+    });
+    if (!res.ok) throw new Error('Failed to delete booking');
+  },
+
+  // Services Management
+  async getBookingServices(bookingId: string) {
+    const res = await apiClient(`/api/operations/bookings/${bookingId}/services`);
+    if (!res.ok) throw new Error('Failed to fetch services');
+    return (await res.json()).data?.services;
+  },
+
+  async addService(bookingId: string, service: any) {
+    const res = await apiClient(`/api/operations/bookings/${bookingId}/services`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(service)
+    });
+    if (!res.ok) throw new Error('Failed to add service');
+    return (await res.json()).data?.service;
+  },
+
+  async updateService(bookingId: string, serviceId: string, updates: any) {
+    const res = await apiClient(`/api/operations/bookings/${bookingId}/services/${serviceId}`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(updates)
+    });
+    if (!res.ok) throw new Error('Failed to update service');
+    return (await res.json()).data?.service;
+  },
+
+  async deleteService(bookingId: string, serviceId: string) {
+    const res = await apiClient(`/api/operations/bookings/${bookingId}/services/${serviceId}`, {
+      method: 'DELETE'
+    });
+    if (!res.ok) throw new Error('Failed to delete service');
+  },
+
+  // Group Members
+  async getGroupMembers(bookingId: string) {
+    const res = await apiClient(`/api/operations/bookings/${bookingId}/group-members`);
+    if (!res.ok) throw new Error('Failed to fetch group members');
+    return (await res.json()).data?.members;
+  },
+
+  async addGroupMember(bookingId: string, member: any) {
+    const res = await apiClient(`/api/operations/bookings/${bookingId}/group-members`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(member)
+    });
+    if (!res.ok) throw new Error('Failed to add group member');
+    return (await res.json()).data?.member;
+  },
+
+  async updateGroupMember(memberId: string, updates: any) {
+    const res = await apiClient(`/api/operations/group-members/${memberId}`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(updates)
+    });
+    if (!res.ok) throw new Error('Failed to update member');
+    return (await res.json()).data?.member;
+  },
+
+  async deleteGroupMember(memberId: string) {
+    const res = await apiClient(`/api/operations/group-members/${memberId}`, {
+      method: 'DELETE'
+    });
+    if (!res.ok) throw new Error('Failed to delete member');
+  },
+
+  // Cancellation
+  async cancelBooking(bookingId: string, payload: any) {
+    const res = await apiClient(`/api/operations/bookings/${bookingId}/cancel`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload)
+    });
+    if (!res.ok) throw new Error('Failed to cancel booking');
+    return (await res.json()).data?.cancellation;
   }
 };

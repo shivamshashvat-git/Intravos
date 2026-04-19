@@ -1,85 +1,68 @@
-import { supabase } from '@/core/lib/supabase';
 import { TaskType, TaskFilters } from '@/features/tasks/types/task';
+import { apiClient } from '@/core/lib/apiClient';
 
 export const tasksService = {
   async getTasks(tenantId: string, filters: TaskFilters = {}) {
-    let query = supabase
-      .from('tasks')
-      .select(`
-        *,
-        assigned:users!tasks_assigned_to_fkey(name, avatar_url),
-        lead:leads!tasks_lead_id_fkey(customer_name, destination),
-        booking:bookings!tasks_booking_id_fkey(booking_number, title),
-        customer:customers!tasks_customer_id_fkey(name)
-      `)
-      .eq('tenant_id', tenantId)
-      .is('deleted_at', null);
+    const params = new URLSearchParams();
+    if (filters.status) params.append('status', filters.status);
+    if (filters.priority) params.append('priority', filters.priority);
+    if (filters.assigned_to) params.append('assigned_to', filters.assigned_to);
+    if (filters.search) params.append('search', filters.search);
+    if (filters.entity_type) params.append('entity_type', filters.entity_type);
+    if (filters.entity_id) params.append('entity_id', filters.entity_id);
 
-    if (filters.status && filters.status !== 'all') query = query.eq('status', filters.status);
-    if (filters.priority && filters.priority !== 'all') query = query.eq('priority', filters.priority);
-    if (filters.assigned_to) query = query.eq('assigned_to', filters.assigned_to);
-    if (filters.lead_id) query = query.eq('lead_id', filters.lead_id);
-    if (filters.booking_id) query = query.eq('booking_id', filters.booking_id);
-    if (filters.customer_id) query = query.eq('customer_id', filters.customer_id);
-    if (filters.is_done !== undefined) query = query.eq('is_done', filters.is_done);
-    if (filters.search) query = query.ilike('title', `%${filters.search}%`);
-
-    if (filters.overdue) {
-      query = query.lt('due_date', new Date().toISOString()).eq('is_done', false);
-    }
-
-    const { data, error } = await query
-      .order('is_done', { ascending: true })
-      .order('due_date', { ascending: true, nullsFirst: false });
-
-    if (error) throw error;
-    
-    return data.map(t => ({
-      ...t,
-      assigned_to_name: t.assigned?.name,
-      lead_name: t.lead?.customer_name,
-      lead_destination: t.lead?.destination,
-      booking_number: t.booking?.booking_number,
-      booking_title: t.booking?.title,
-      customer_name: t.customer?.name
-    })) as TaskType[];
+    const res = await apiClient(`/api/v1/tasks?${params.toString()}`);
+    if (!res.ok) throw new Error('Failed to fetch tasks');
+    const result = await res.json();
+    return result.data || [];
   },
 
   async createTask(data: Partial<TaskType>) {
-    const { data: task, error } = await supabase.from('tasks').insert(data).select().single();
-    if (error) throw error;
-    
-    // Fire-and-forget notification if assigned to another user
-    if (data.assigned_to && data.assigned_to !== (await supabase.auth.getUser()).data.user?.id) {
-       supabase.from('notifications').insert({
-         tenant_id: data.tenant_id,
-         user_id: data.assigned_to,
-         notif_type: 'task_assigned',
-         title: 'New task assigned to you',
-         message: data.title,
-         task_id: task.id,
-         lead_id: data.lead_id
-       }).then();
+    const res = await apiClient(`/api/v1/tasks`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(data)
+    });
+    if (!res.ok) {
+      const err = await res.json();
+      throw new Error(err.error || 'Failed to create task');
     }
-    return task as TaskType;
+    const result = await res.json();
+    return result.data?.task || result.data;
   },
 
   async updateTask(id: string, data: Partial<TaskType>) {
-    const { error } = await supabase.from('tasks').update({ ...data, updated_at: new Date().toISOString() }).eq('id', id);
-    if (error) throw error;
+    const res = await apiClient(`/api/v1/tasks/${id}`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(data)
+    });
+    if (!res.ok) {
+      const err = await res.json();
+      throw new Error(err.error || 'Failed to update task');
+    }
+    const result = await res.json();
+    return result.data?.task || result.data;
   },
 
   async completeTask(id: string) {
-    const { error } = await supabase.from('tasks').update({ 
-      is_done: true, 
-      status: 'completed',
-      updated_at: new Date().toISOString() 
-    }).eq('id', id);
-    if (error) throw error;
+    const res = await apiClient(`/api/v1/tasks/${id}/complete`, {
+      method: 'PATCH'
+    });
+    if (!res.ok) throw new Error('Failed to complete task');
   },
 
   async deleteTask(id: string) {
-    const { error } = await supabase.from('tasks').update({ deleted_at: new Date().toISOString() }).eq('id', id);
-    if (error) throw error;
+    const res = await apiClient(`/api/v1/tasks/${id}`, {
+      method: 'DELETE'
+    });
+    if (!res.ok) throw new Error('Failed to delete task');
+  },
+
+  async getAnalytics() {
+    const res = await apiClient(`/api/v1/tasks/analytics`);
+    if (!res.ok) throw new Error('Failed to fetch task analytics');
+    const result = await res.json();
+    return result.data;
   }
 };

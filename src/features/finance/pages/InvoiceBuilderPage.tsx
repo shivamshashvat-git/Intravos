@@ -18,7 +18,7 @@ export const InvoiceBuilderPage: React.FC = () => {
   const [searchParams] = useSearchParams();
   const navigate = useNavigate();
   const { user, tenant } = useAuth();
-  const isAdmin = user?.role === 'admin' || user?.role === 'super_admin';
+  const isAdmin = ['admin', 'agency_admin', 'super_admin'].includes(user?.role || '');
   const quoteId = searchParams.get('quotation_id');
 
   const { 

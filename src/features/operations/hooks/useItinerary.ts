@@ -1,3 +1,4 @@
+
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { ItineraryWithDetails, ItineraryDay, ItineraryItem, ItineraryItemType } from '@/features/operations/types/itinerary';
 import { itinerariesService } from '@/features/operations/services/itinerariesService';
@@ -14,7 +15,7 @@ export function useItinerary(id: string) {
     if (!id || !tenant?.id) return;
     setIsLoading(true);
     try {
-      const res = await itinerariesService.getItineraryById(id, tenant.id);
+      const res = await itinerariesService.getItineraryById(id);
       setData(res);
     } catch (e) {
       console.error(e);
@@ -33,7 +34,7 @@ export function useItinerary(id: string) {
       if (!prev) return null;
       return {
         ...prev,
-        days: prev.days.map(d => d.id === dayId ? { ...d, ...updates } : d)
+        days: (prev.days || []).map(d => d.id === dayId ? { ...d, ...updates } : d)
       };
     });
   };
@@ -43,7 +44,7 @@ export function useItinerary(id: string) {
       if (!prev) return null;
       return {
         ...prev,
-        days: prev.days.map(d => ({
+        days: (prev.days || []).map(d => ({
           ...d,
           items: d.items.map(it => it.id === itemId ? { ...it, ...updates } : it)
         }))
@@ -54,13 +55,13 @@ export function useItinerary(id: string) {
   // Actions
   const addDay = async () => {
     if (!data || !tenant?.id) return;
-    const sortOrder = data.days.length > 0 ? Math.max(...data.days.map(d => d.sort_order)) + 10 : 0;
-    const newDay = await itinerariesService.addDay(data.id, tenant.id, {
-       day_number: data.days.length + 1,
+    const sortOrder = (data.days || []).length > 0 ? Math.max(...data.days.map(d => d.sort_order)) + 10 : 0;
+    const newDay = await itinerariesService.addDay(data.id, {
+       day_number: (data.days || []).length + 1,
        sort_order: sortOrder,
-       title: `Day ${data.days.length + 1}`
+       title: `Day ${(data.days || []).length + 1}`
     });
-    setData({ ...data, days: [...data.days, { ...newDay, items: [] }] });
+    setData({ ...data, days: [...(data.days || []), { ...newDay, items: [] }] });
   };
 
   const updateDay = async (dayId: string, updates: Partial<ItineraryDay>) => {
@@ -68,7 +69,7 @@ export function useItinerary(id: string) {
     if (debounceTimers.current[dayId]) clearTimeout(debounceTimers.current[dayId]);
     debounceTimers.current[dayId] = setTimeout(async () => {
       setIsSaving(true);
-      try { await itinerariesService.updateDay(dayId, tenant!.id, updates); } catch (e) { fetchData(); }
+      try { await itinerariesService.updateDay(dayId, updates); } catch (e) { fetchData(); }
       setIsSaving(false);
     }, 800);
   };
@@ -76,14 +77,14 @@ export function useItinerary(id: string) {
   const deleteDay = async (dayId: string) => {
     if (!window.confirm('Delete this day and all its items?')) return;
     setData(prev => prev ? { ...prev, days: prev.days.filter(d => d.id !== dayId) } : null);
-    await itinerariesService.deleteDay(dayId, tenant!.id);
+    await itinerariesService.deleteDay(dayId);
   };
 
   const addItem = async (dayId: string, type: ItineraryItemType) => {
     const day = data?.days.find(d => d.id === dayId);
     if (!day || !tenant?.id) return;
     const sortOrder = day.items.length > 0 ? Math.max(...day.items.map(i => i.sort_order)) + 10 : 0;
-    const newItem = await itinerariesService.addItem(dayId, tenant.id, {
+    const newItem = await itinerariesService.addItem(dayId, {
        item_type: type,
        title: 'New ' + type,
        sort_order: sortOrder
@@ -103,7 +104,7 @@ export function useItinerary(id: string) {
     if (debounceTimers.current[itemId]) clearTimeout(debounceTimers.current[itemId]);
     debounceTimers.current[itemId] = setTimeout(async () => {
        setIsSaving(true);
-       try { await itinerariesService.updateItem(itemId, tenant!.id, updates); } catch (e) { fetchData(); }
+       try { await itinerariesService.updateItem(itemId, updates); } catch (e) { fetchData(); }
        setIsSaving(false);
     }, 800);
   };
@@ -119,19 +120,7 @@ export function useItinerary(id: string) {
          }))
        };
     });
-    await itinerariesService.deleteItem(itemId, tenant!.id);
-  };
-
-  const reorderDays = async (dayIds: string[]) => {
-    setData(prev => {
-      if (!prev) return null;
-      const sortedDays = dayIds.map((id, idx) => {
-        const d = prev.days.find(day => day.id === id)!;
-        return { ...d, day_number: idx + 1, sort_order: idx * 10 };
-      });
-      return { ...prev, days: sortedDays };
-    });
-    await itinerariesService.reorderDays(id, tenant!.id, dayIds);
+    await itinerariesService.deleteItem(itemId);
   };
 
   const reorderItemsInDay = async (dayId: string, itemIds: string[]) => {
@@ -149,35 +138,25 @@ export function useItinerary(id: string) {
         })
       };
     });
-    await itinerariesService.reorderItems(dayId, tenant!.id, itemIds);
+    await itinerariesService.reorderItems(dayId, itemIds);
   };
 
   const updateItinerary = async (updates: Partial<ItineraryWithDetails>) => {
     if (!data || !tenant?.id) return;
     setData({ ...data, ...updates });
-    await itinerariesService.updateItinerary(data.id, tenant.id, updates as any);
+    await itinerariesService.updateItinerary(data.id, updates as any);
   };
 
-  const toggleShare = async () => {
-    if (!data || !tenant?.id) return;
-    const newShare = !data.is_public;
-    const updates = { is_public: newShare, status: (newShare ? 'shared' : 'ready') as any };
-    setData({ ...data, ...updates });
-    await itinerariesService.updateItinerary(data.id, tenant.id, updates);
-  };
-
-  const loadFromTemplate = async (templateId: string) => {
-    if (!id || !tenant?.id) return;
-    setIsSaving(true);
-    try {
-      await itinerariesService.loadTemplate(id, templateId);
-      await fetchData();
-    } catch (e: any) {
-      console.error(e);
-      throw e;
-    } finally {
-      setIsSaving(false);
-    }
+  const generatePdf = async () => {
+    if (!data) return;
+    const blob = await itinerariesService.generatePdf(data.id);
+    const url = window.URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `Itinerary-${data.title}.pdf`;
+    document.body.appendChild(a);
+    a.click();
+    window.URL.revokeObjectURL(url);
   };
 
   return {
@@ -187,14 +166,12 @@ export function useItinerary(id: string) {
     addDay,
     updateDay,
     deleteDay,
-    reorderDays,
     addItem,
     updateItem,
     deleteItem,
     reorderItemsInDay,
-    toggleShare,
     updateItinerary,
-    loadFromTemplate,
+    generatePdf,
     refreshItinerary: fetchData
   };
 }

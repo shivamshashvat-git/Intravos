@@ -170,10 +170,14 @@ export const DashboardPage: React.FC = () => {
          {/* Right Column (Ops + Tasks) */}
          <div className="lg:col-span-4 space-y-8">
             <section className="bg-white rounded-[2.5rem] border border-slate-200 overflow-hidden shadow-xl shadow-slate-100">
-               <div className="p-8 border-b border-slate-100 bg-indigo-50/20">
+               <div className="p-8 border-b border-slate-100 bg-indigo-50/20 flex items-center justify-between">
                   <h3 className="text-[10px] font-black uppercase text-indigo-900 tracking-[0.2em] flex items-center gap-2">
                      <Zap className="w-4 h-4 text-indigo-600" /> Operational Departures
                   </h3>
+                  <Link to="/calendar" className="flex items-center gap-1.5 px-3 py-1.5 bg-indigo-600 text-white rounded-xl text-[9px] font-black uppercase tracking-widest hover:bg-indigo-700 transition-all active:scale-95">
+                     <Calendar className="w-3 h-3" />
+                     Calendar
+                  </Link>
                </div>
                <div className="p-8 space-y-4">
                   {data.upcomingDepartures.length === 0 ? (

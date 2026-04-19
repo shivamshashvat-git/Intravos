@@ -23,7 +23,7 @@ export const CreateBookingDrawer: React.FC<Props> = ({
   isOpen, onClose, preFillLeadId, onSuccess, initialData 
 }) => {
   const { tenant, user } = useAuth();
-  const isAdmin = user?.role === 'admin' || user?.role === 'super_admin';
+  const isAdmin = ['admin', 'agency_admin', 'super_admin'].includes(user?.role || '');
   const [isSaving, setIsSaving] = useState(false);
 
   const [formData, setFormData] = useState<Partial<Booking>>({

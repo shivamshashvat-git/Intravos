@@ -1,120 +1,78 @@
 import leadsController from './leads.controller.js';
-import { z } from 'zod';
 import { validate } from '../../../core/middleware/validate.js';
 import express from 'express';
-import { supabaseAdmin, supabaseForUser  } from '../../../providers/database/supabase.js';
 import { authenticate, authenticateApiKey  } from '../../../core/middleware/auth.js';
-import { requireStaff, requireAdmin, requireWriteAccess } from '../../../core/middleware/rbac.js';
+import { requireStaff, requireAdmin, requireSecondary, requireWriteAccess } from '../../../core/middleware/rbac.js';
 import { requireFeature } from '../../../core/middleware/featureFlag.js';
-
 import { asyncHandler  } from '../../../core/middleware/errorHandler.js';
-import { softDeleteDirect  } from '../../../core/utils/softDelete.js';
+import { 
+  leadCreateSchema, 
+  leadUpdateSchema, 
+  leadNoteSchema, 
+  leadFollowupSchema, 
+  leadAssignSchema 
+} from './leads.schema.js';
 
 const router = express.Router();
 
-// ── ZOD SCHEMAS ──
-const leadPublicSchema = z.object({
-  customer_name: z.string().min(1, "Customer name is required"),
-  customer_phone: z.string().min(1, "Phone is required"),
-  customer_email: z.string().email().optional().or(z.literal('')),
-  destination: z.string().optional(),
-  hotel_name: z.string().optional(),
-  location: z.string().optional(),
-  checkin_date: z.string().optional(),
-  checkout_date: z.string().optional(),
-  guests: z.number().int().positive().optional(),
-  rooms: z.number().int().positive().optional(),
-  price_seen: z.number().optional(),
-  source: z.enum(['whatsapp', 'website', 'referral', 'agent', 'network', 'campaign', 'instagram', 'manual']).optional(),
-  travel_start_date: z.string().optional(),
-  utm_source: z.string().optional(),
-  utm_medium: z.string().optional(),
-  utm_campaign: z.string().optional(),
-});
-
-const leadCreateSchema = z.object({
-  customer_name: z.string().min(1, "Customer name is required").optional(),
-  customer_phone: z.string().min(1, "Phone is required").optional(),
-  customer_email: z.string().email().optional().or(z.literal('')),
-  customer_id: z.string().uuid().optional(),
-  destination: z.string().optional(),
-  checkin_date: z.string().optional(),
-  checkout_date: z.string().optional(),
-  guests: z.number().int().positive().optional(),
-  rooms: z.number().int().positive().optional(),
-  source: z.enum(['manual', 'whatsapp', 'website', 'referral', 'agent', 'network', 'campaign', 'instagram']).optional(),
-  travel_start_date: z.string().optional(),
-  assigned_to: z.string().uuid().optional(),
-  tags: z.array(z.string()).optional()
-}).refine(data => data.customer_id || (data.customer_name && data.customer_phone), {
-  message: "Either customer_id or (customer_name + customer_phone) must be provided."
-});
-
-
 // ── PUBLIC LEAD CREATION (from website forms) ──
 // POST /api/leads/public
-router.post('/public', authenticateApiKey, validate(leadPublicSchema), asyncHandler((req, res) => leadsController.createPublicLead(req, res)));;
+router.post('/public', authenticateApiKey, asyncHandler((req, res, next) => leadsController.createPublicLead(req, res, next)));
 
 // ── AUTHENTICATED LEAD ROUTES ──
 
+// GET /api/leads/analytics — CRM Pipeline Insights (Must be before /:id)
+router.get('/analytics', authenticate, requireStaff(), requireFeature('leads'), asyncHandler((req, res, next) => leadsController.getAnalytics(req, res, next)));
+
 // GET /api/leads — list leads with filters
-router.get('/', authenticate, requireStaff(), requireFeature('leads'), asyncHandler((req, res) => leadsController.listLeads(req, res)));;
+router.get('/', authenticate, requireStaff(), requireFeature('leads'), asyncHandler((req, res, next) => leadsController.listLeads(req, res, next)));
 
 // GET /api/leads/:id — single lead with all related data
-router.get('/:id', authenticate, requireStaff(), requireFeature('leads'), asyncHandler((req, res) => leadsController.getLeadById(req, res)));;
-
-router.get('/:id/booking-confirmation/pdf', authenticate, requireStaff(), requireFeature('leads'), asyncHandler((req, res) => leadsController.getLeadBookingPdf(req, res)));;
+router.get('/:id', authenticate, requireStaff(), requireFeature('leads'), asyncHandler((req, res, next) => leadsController.getLeadById(req, res, next)));
 
 // POST /api/leads — create lead (authenticated, manual entry)
-router.post('/', authenticate, requireStaff(), requireWriteAccess, requireFeature('leads'), asyncHandler((req, res) => leadsController.createLead(req, res)));;
+router.post('/', authenticate, requireStaff(), requireWriteAccess, requireFeature('leads'), validate(leadCreateSchema), asyncHandler((req, res, next) => leadsController.createLead(req, res, next)));
 
 // PATCH /api/leads/:id — update lead
-router.patch('/:id', authenticate, requireStaff(), requireWriteAccess, requireFeature('leads'), asyncHandler((req, res) => leadsController.updateLead(req, res)));;
+router.patch('/:id', authenticate, requireStaff(), requireWriteAccess, requireFeature('leads'), validate(leadUpdateSchema), asyncHandler((req, res, next) => leadsController.updateLead(req, res, next)));
 
-router.delete('/:id', authenticate, requireAdmin(), requireWriteAccess, requireFeature('leads'), asyncHandler((req, res) => leadsController.deleteLead(req, res)));;
-
-router.get('/:id/modifications', authenticate, requireStaff(), requireFeature('leads'), asyncHandler((req, res) => leadsController.getLeadModifications(req, res)));;
+// DELETE /api/leads/:id — soft delete lead
+router.delete('/:id', authenticate, requireAdmin(), requireWriteAccess, requireFeature('leads'), asyncHandler((req, res, next) => leadsController.deleteLead(req, res, next)));
 
 // ── LEAD NOTES ──
 
+// GET /api/leads/:id/notes
+router.get('/:id/notes', authenticate, requireStaff(), requireFeature('leads'), asyncHandler((req, res, next) => leadsController.getLeadNotes(req, res, next)));
+
 // POST /api/leads/:id/notes
-router.post('/:id/notes', authenticate, requireStaff(), requireWriteAccess, requireFeature('leads'), asyncHandler((req, res) => leadsController.addLeadNote(req, res)));;
+router.post('/:id/notes', authenticate, requireStaff(), requireWriteAccess, requireFeature('leads'), validate(leadNoteSchema), asyncHandler((req, res, next) => leadsController.addLeadNote(req, res, next)));
+
+// ── LEAD FOLLOW-UPS ──
+
+// GET /api/leads/:id/followups
+router.get('/:id/followups', authenticate, requireStaff(), requireFeature('leads'), asyncHandler((req, res, next) => leadsController.getLeadFollowups(req, res, next)));
+
+// POST /api/leads/:id/followups
+router.post('/:id/followups', authenticate, requireStaff(), requireWriteAccess, requireFeature('leads'), validate(leadFollowupSchema), asyncHandler((req, res, next) => leadsController.addLeadFollowup(req, res, next)));
 
 // ── LEAD COMMUNICATIONS ──
 
 // POST /api/leads/:id/communications
-router.post('/:id/communications', authenticate, requireStaff(), requireWriteAccess, requireFeature('leads'), asyncHandler((req, res) => leadsController.recordLeadCommunication(req, res)));;
+router.post('/:id/communications', authenticate, requireStaff(), requireWriteAccess, requireFeature('leads'), asyncHandler((req, res, next) => leadsController.recordLeadCommunication(req, res, next)));
 
-// ── WHATSAPP SHARE URLs ──
+// ── DOCUMENTS & ATTACHMENTS ──
 
-// GET /api/leads/:id/share-urls
-router.get('/:id/share-urls', authenticate, requireStaff(), asyncHandler((req, res) => leadsController.getLeadShareUrls(req, res)));;
-
-// ── LEAD ATTACHMENTS ──
-
-// GET /api/leads/:id/attachments
-router.get('/:id/attachments', authenticate, requireStaff(), requireFeature('leads'), asyncHandler((req, res) => leadsController.getLeadAttachments(req, res)));;
-
-router.get('/:id/documents', authenticate, requireStaff(), requireFeature('leads'), asyncHandler((req, res) => leadsController.getLeadDocuments(req, res)));;
-
-router.post('/:id/documents', authenticate, requireStaff(), requireWriteAccess, requireFeature('leads'), asyncHandler((req, res) => leadsController.uploadLeadDocument(req, res)));;
-
-router.patch('/:id/documents/:documentId', authenticate, requireStaff(), requireWriteAccess, requireFeature('leads'), asyncHandler((req, res) => leadsController.updateLeadDocument(req, res)));;
-
-// DELETE /api/leads/:id/attachments/:attachmentId
-router.delete('/:id/attachments/:attachmentId', authenticate, requireStaff(), requireWriteAccess, requireFeature('leads'), asyncHandler((req, res) => leadsController.deleteLeadAttachment(req, res)));
+router.get('/:id/attachments', authenticate, requireStaff(), requireFeature('leads'), asyncHandler((req, res, next) => leadsController.getLeadAttachments(req, res, next)));
+router.get('/:id/documents', authenticate, requireStaff(), requireFeature('leads'), asyncHandler((req, res, next) => leadsController.getLeadDocuments(req, res, next)));
+router.post('/:id/documents', authenticate, requireStaff(), requireWriteAccess, requireFeature('leads'), asyncHandler((req, res, next) => leadsController.uploadLeadDocument(req, res, next)));
 
 // ── LEAD REASSIGNMENT ──
 
-// POST /api/leads/:id/assign — dedicated reassignment with full audit trail
-router.post('/:id/assign', authenticate, requireAdmin(), requireWriteAccess, requireFeature('leads'), asyncHandler((req, res, next) => leadsController.assignLead(req, res, next)));
+router.post('/:id/assign', authenticate, requireSecondary(), requireWriteAccess, requireFeature('leads'), validate(leadAssignSchema), asyncHandler((req, res, next) => leadsController.assignLead(req, res, next)));
 
 // ── BULK OPERATIONS ──
 
-// POST /api/leads/bulk-assign — assign multiple leads to a staff member
-router.post('/bulk-assign', authenticate, requireAdmin(), requireWriteAccess, requireFeature('leads'), asyncHandler((req, res, next) => leadsController.bulkAssignLeads(req, res, next)));
-
-// POST /api/leads/bulk-status — change status of multiple leads
-router.post('/bulk-status', authenticate, requireAdmin(), requireWriteAccess, requireFeature('leads'), asyncHandler((req, res, next) => leadsController.bulkUpdateLeadStatus(req, res, next)));
+router.post('/bulk-assign', authenticate, requireSecondary(), requireWriteAccess, requireFeature('leads'), asyncHandler((req, res, next) => leadsController.bulkAssignLeads(req, res, next)));
+router.post('/bulk-status', authenticate, requireSecondary(), requireWriteAccess, requireFeature('leads'), asyncHandler((req, res, next) => leadsController.bulkUpdateLeadStatus(req, res, next)));
 
 export default router;

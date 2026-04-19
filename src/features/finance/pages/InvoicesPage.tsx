@@ -19,7 +19,7 @@ export const InvoicesPage: React.FC = () => {
     summary, toggleOverdue, refresh 
   } = useInvoices();
 
-  const isAdmin = user?.role === 'admin' || user?.role === 'super_admin';
+  const isAdmin = ['admin', 'agency_admin', 'super_admin'].includes(user?.role || '');
 
   const statusTabs: { id: InvoiceStatus | 'all'; label: string; color: string }[] = [
     { id: 'all', label: 'All Nodes', color: 'bg-slate-100 text-slate-600' },

@@ -1,6 +1,7 @@
 import { supabaseAdmin } from '../../../providers/database/supabase.js';
 import financialService from '../shared/financialService.js';
 import quotationService from '../quotations/quotation.service.js';
+import { softDeleteDirect } from '../../../core/utils/softDelete.js';
 
 /**
  * InvoiceService — Financial Orchestration & GST Compliance
@@ -10,13 +11,13 @@ class InvoiceService {
    * Create a manual invoice
    */
   async createInvoice(tenantId, userId, payload) {
-    const { items, gst_type, ...invoiceData } = payload;
+    const { items, place_of_supply, ...invoiceData } = payload;
     
     // 1. Context & Calculations
     const { data: tenant } = await supabaseAdmin.from('tenants').select('*').eq('id', tenantId).single();
     if (!tenant.invoice_prefix) throw new Error('Invoice settings not configured');
 
-    const fin = financialService.calculateGst(items, gst_type);
+    const fin = financialService.calculateGst(items, tenant.agency_state, place_of_supply);
     const fy = financialService.getCurrentFinancialYear();
     const invoiceNumber = `${tenant.invoice_prefix}/${fy}/${String(tenant.invoice_next_num).padStart(4, '0')}`;
 
@@ -32,12 +33,14 @@ class InvoiceService {
         agency_address: tenant.agency_address,
         agency_gstin: tenant.gstin,
         agency_pan: tenant.pan,
+        place_of_supply,
         subtotal: fin.subtotal,
-        gst_type,
+        gst_type: fin.gstType,
         cgst: fin.cgst,
         sgst: fin.sgst,
         igst: fin.igst,
         total: fin.total,
+        amount_outstanding: fin.total,
         created_by: userId
       })
       .select()
@@ -46,15 +49,16 @@ class InvoiceService {
     if (error) throw error;
 
     const lineItems = fin.processedItems.map(item => ({
+      tenant_id: tenantId,
       invoice_id: invoice.id,
       description: item.description,
       sac_code: item.sac_code || '998551',
       amount: item.amount,
       gst_rate: item.gst_rate,
-      cgst: gst_type === 'cgst_sgst' ? (item.gst_amount / 2) : 0,
-      sgst: gst_type === 'cgst_sgst' ? (item.gst_amount / 2) : 0,
-      igst: gst_type === 'igst' ? item.gst_amount : 0,
-      total: item.amount + item.gst_amount,
+      cgst: item.cgst,
+      sgst: item.sgst,
+      igst: item.igst,
+      total: item.total,
       sort_order: item.sort_order
     }));
 
@@ -79,17 +83,22 @@ class InvoiceService {
       customer_phone: quotation.customer_phone,
       customer_email: quotation.customer_email,
       customer_gstin: quotation.customer_gstin,
-      items: quotation.quotation_items,
-      gst_type: quotation.gst_type
+      place_of_supply: quotation.place_of_supply,
+      items: quotation.quotation_items
     });
 
-    // Update Lead to 'booked' state
+    // Update Lead to 'converted' state
     await supabaseAdmin.from('leads').update({ 
-      status: 'booked', 
+      status: 'converted', 
       selling_price: quotation.total, 
       cost_price: quotation.total_cost_price, 
       margin: quotation.total_margin 
     }).eq('id', quotation.lead_id);
+
+    // Mark quotation as accepted if not already
+    if (quotation.status !== 'accepted') {
+       await supabaseAdmin.from('quotations').update({ status: 'accepted' }).eq('id', quoteId);
+    }
 
     return invoice;
   }
@@ -97,7 +106,7 @@ class InvoiceService {
   async getById(tenantId, invoiceId) {
     const { data, error } = await supabaseAdmin
       .from('invoices')
-      .select('*, invoice_items(*)')
+      .select('*, invoice_items(*), payments:payment_transactions(*)')
       .eq('id', invoiceId)
       .eq('tenant_id', tenantId)
       .is('deleted_at', null)
@@ -107,9 +116,123 @@ class InvoiceService {
     return data;
   }
 
+  async listInvoices(tenantId, filters) {
+    const { status, invoice_type, search, page = 1, limit = 50 } = filters;
+    
+    let query = supabaseAdmin
+      .from('invoices')
+      .select('*, customer:customers(name, email)', { count: 'exact' })
+      .eq('tenant_id', tenantId)
+      .is('deleted_at', null)
+      .order('created_at', { ascending: false })
+      .range((page - 1) * limit, page * limit - 1);
+
+    if (status && status !== 'all') query = query.eq('status', status);
+    if (invoice_type) query = query.eq('invoice_type', invoice_type);
+    if (search) query = query.or(`invoice_number.ilike.%${search}%,customer_name.ilike.%${search}%`);
+
+    const { data, error, count } = await query;
+    if (error) throw error;
+
+    return { invoices: data, total: count, page: parseInt(page, 10) };
+  }
+
+  async updateInvoice(tenantId, userId, invoiceId, payload) {
+    const { items, ...metadata } = payload;
+    const oldSnapshot = await this.getById(tenantId, invoiceId);
+    if (!oldSnapshot) throw new Error('Invoice not found');
+
+    let updates = { ...metadata, updated_at: new Date().toISOString() };
+
+    if (items) {
+      const { data: tenant } = await supabaseAdmin.from('tenants').select('agency_state').eq('id', tenantId).single();
+      const placeOfSupply = metadata.place_of_supply || oldSnapshot.place_of_supply;
+      const fin = financialService.calculateGst(items, tenant.agency_state, placeOfSupply);
+      
+      updates = {
+        ...updates,
+        subtotal: fin.subtotal,
+        cgst: fin.cgst,
+        sgst: fin.sgst,
+        igst: fin.igst,
+        total: fin.total,
+        amount_outstanding: fin.total - (oldSnapshot.amount_paid || 0),
+        gst_type: fin.gstType
+      };
+
+      // Atomic Replace Items
+      await supabaseAdmin.from('invoice_items').delete().eq('invoice_id', invoiceId);
+      const newItems = fin.processedItems.map(item => ({
+        tenant_id: tenantId,
+        invoice_id: invoiceId,
+        description: item.description,
+        sac_code: item.sac_code || '998551',
+        amount: item.amount,
+        gst_rate: item.gst_rate,
+        cgst: item.cgst,
+        sgst: item.sgst,
+        igst: item.igst,
+        total: item.total,
+        sort_order: item.sort_order
+      }));
+      await supabaseAdmin.from('invoice_items').insert(newItems);
+
+      // Audit price mutations
+      await this._auditMutation(tenantId, userId, 'invoice', invoiceId, oldSnapshot, updates);
+    }
+
+    const { data, error } = await supabaseAdmin
+      .from('invoices')
+      .update(updates)
+      .eq('id', invoiceId)
+      .eq('tenant_id', tenantId)
+      .select()
+      .single();
+
+    if (error) throw error;
+    return data;
+  }
+
+  async deleteInvoice(tenantId, invoiceId) {
+    return await softDeleteDirect({ table: 'invoices', id: invoiceId, tenantId });
+  }
+
   /**
-   * Aggregate GST Summary
+   * Recalculate invoice totals and payment status
    */
+  async recalculate(tenantId, invoiceId) {
+    const invoice = await this.getById(tenantId, invoiceId);
+    if (!invoice) throw new Error('Invoice not found');
+
+    const totalPaid = (invoice.payments || []).reduce((sum, p) => sum + parseFloat(p.amount), 0);
+    const totalAmount = parseFloat(invoice.total);
+    const outstanding = Math.max(0, totalAmount - totalPaid);
+
+    let status = invoice.status;
+    if (totalPaid === 0) {
+      status = 'unpaid';
+    } else if (outstanding <= 1) { // 1 unit tolerance for rounding
+      status = 'paid';
+    } else {
+      status = 'partially_paid';
+    }
+
+    const { data, error } = await supabaseAdmin
+      .from('invoices')
+      .update({
+        amount_paid: totalPaid,
+        amount_outstanding: outstanding,
+        status,
+        updated_at: new Date().toISOString()
+      })
+      .eq('id', invoiceId)
+      .select()
+      .single();
+
+    if (error) throw error;
+    return data;
+  }
+
   async getGstSummary(tenantId, financialYear) {
     const fy = financialYear || financialService.getCurrentFinancialYear();
     const { data, error } = await supabaseAdmin
@@ -125,118 +248,89 @@ class InvoiceService {
     const byMonth = {};
     for (const inv of data) {
       const d = new Date(inv.created_at);
-      const key = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
-      if (!byMonth[key]) byMonth[key] = { month: key, taxable_value: 0, total_tax: 0, invoice_count: 0 };
-      byMonth[key].taxable_value += parseFloat(inv.subtotal) || 0;
-      byMonth[key].total_tax += (parseFloat(inv.cgst) + parseFloat(inv.sgst) + parseFloat(inv.igst)) || 0;
-      byMonth[key].invoice_count += 1;
+      const key = d.toLocaleString('default', { month: 'long', year: 'numeric' });
+      const monthIdx = d.getMonth();
+      const year = d.getFullYear();
+      const sortKey = `${year}-${String(monthIdx + 1).padStart(2, '0')}`;
+
+      if (!byMonth[sortKey]) {
+        byMonth[sortKey] = {
+          month: key,
+          sortKey,
+          taxable_value: 0,
+          cgst: 0,
+          sgst: 0,
+          igst: 0,
+          total_tax: 0,
+          total_value: 0,
+          invoice_count: 0
+        };
+      }
+
+      const invSubtotal = parseFloat(inv.subtotal) || 0;
+      const invCgst = parseFloat(inv.cgst) || 0;
+      const invSgst = parseFloat(inv.sgst) || 0;
+      const invIgst = parseFloat(inv.igst) || 0;
+      const invTotal = parseFloat(inv.total) || 0;
+
+      byMonth[sortKey].taxable_value += invSubtotal;
+      byMonth[sortKey].cgst += invCgst;
+      byMonth[sortKey].sgst += invSgst;
+      byMonth[sortKey].igst += invIgst;
+      byMonth[sortKey].total_tax += (invCgst + invSgst + invIgst);
+      byMonth[sortKey].total_value += invTotal;
+      byMonth[sortKey].invoice_count += 1;
     }
 
-    return Object.values(byMonth).sort((a, b) => a.month.localeCompare(b.month));
-  }
-
-  async listInvoices(tenantId, filters) {
-    const { status, invoice_type, lead_id, customer_id, from, to, financial_year, page = 1, limit = 50 } = filters;
-    
-    let query = supabaseAdmin
-      .from('invoices')
-      .select('*', { count: 'exact' })
-      .eq('tenant_id', tenantId)
-      .is('deleted_at', null)
-      .order('created_at', { ascending: false })
-      .range((page - 1) * limit, page * limit - 1);
-
-    if (status) query = query.eq('status', status);
-    if (invoice_type) query = query.eq('invoice_type', invoice_type);
-    if (lead_id) query = query.eq('lead_id', lead_id);
-    if (customer_id) query = query.eq('customer_id', customer_id);
-    if (financial_year) query = query.eq('financial_year', financial_year);
-    if (from) query = query.gte('created_at', from);
-    if (to) query = query.lte('created_at', to);
-
-    const { data, error, count } = await query;
-    if (error) throw error;
-
-    return { invoices: data, total: count, page: parseInt(page, 10) };
-  }
-
-  async updateInvoice(tenantId, invoiceId, updates) {
-    const { data, error } = await supabaseAdmin
-      .from('invoices')
-      .update(updates)
-      .eq('id', invoiceId)
-      .eq('tenant_id', tenantId)
-      .select()
-      .single();
-    if (error) throw error;
-    return data;
-  }
-
-  async deleteInvoice(tenantId, invoiceId) {
-    const { error } = await supabaseAdmin
-      .from('invoices')
-      .update({ deleted_at: new Date().toISOString() })
-      .eq('id', invoiceId)
-      .eq('tenant_id', tenantId);
-    if (error) throw error;
-    return { success: true };
-  }
-
-  async createCreditNote(tenantId, userId, parentInvoiceId, payload) {
-    const original = await this.getById(tenantId, parentInvoiceId);
-    if (!original) throw new Error('Invoice not found');
-
-    // Basic inversion logic for credit note
-    const cn = await this.createInvoice(tenantId, userId, {
-      ...payload,
-      customer_id: original.customer_id,
-      invoice_type: 'credit_note',
-      parent_invoice_id: parentInvoiceId
-    });
-
-    return cn;
-  }
-
-  async getPublicInvoiceShare(invoiceIdOrToken) {
-    const { data: invoice } = await supabaseAdmin.from('invoices').select('*, invoice_items(*)').eq('id', invoiceIdOrToken).single();
-    if (!invoice) return null;
-
-    const { data: tenant } = await supabaseAdmin
-      .from('tenants')
-      .select('name, agency_address, agency_phone, agency_email, gstin, pan, invoice_bank_text')
-      .eq('id', invoice.tenant_id)
-      .single();
-
-    return { invoice, tenant_branding: tenant };
+    return Object.values(byMonth).sort((a, b) => a.sortKey.localeCompare(b.sortKey));
   }
 
   async getGstr1Data(tenantId, filters) {
-    const { financial_year } = filters;
-    const { data, error } = await supabaseAdmin
+    const { financial_year, month } = filters;
+    let fy = financial_year || financialService.getCurrentFinancialYear();
+    
+    let query = supabaseAdmin
       .from('invoices')
-      .select('invoice_number, created_at, customer_name, customer_gstin, subtotal, cgst, sgst, igst, total')
+      .select('invoice_number, created_at, customer_name, customer_gstin, total, subtotal, cgst, sgst, igst')
       .eq('tenant_id', tenantId)
-      .eq('financial_year', financial_year || financialService.getCurrentFinancialYear())
-      .is('deleted_at', null);
+      .eq('financial_year', fy)
+      .is('deleted_at', null)
+      .not('status', 'eq', 'cancelled')
+      .order('created_at', { ascending: true });
+      
+    if (month) {
+      // filtering by month (1-12) will be done in-memory for simplicity right now
+      // as supabase year/month filtering can be complex without custom RPC
+    }
 
+    const { data, error } = await query;
     if (error) throw error;
-    return data || [];
+    
+    if (month) {
+       return data.filter(inv => new Date(inv.created_at).getMonth() + 1 === parseInt(month, 10));
+    }
+    return data;
   }
 
-  async createPaymentLink(tenantId, invoiceId) {
-     const invoice = await this.getById(tenantId, invoiceId);
-     if (!invoice) throw new Error("Invoice not found");
-     
-     if (invoice.payment_link_url) return invoice.payment_link_url;
+  // ── AUDIT LOGGING ──
 
-     const balance = (invoice.total || 0) - (invoice.amount_paid || 0);
-     if (balance <= 0) throw new Error("Invoice already paid");
-
-     const mockGatewayUrl = `https://checkout.sandbox.paymentgateway.com/pay/${invoice.id}`;
-
-     await supabaseAdmin.from('invoices').update({ payment_link_url: mockGatewayUrl }).eq('id', invoiceId);
-     
-     return mockGatewayUrl;
+  async _auditMutation(tenantId, userId, entityType, entityId, oldSnapshot, newSnapshot) {
+    const priceFields = ['subtotal', 'total', 'amount_paid', 'amount_outstanding'];
+    for (const field of priceFields) {
+      if (newSnapshot[field] !== undefined && parseFloat(newSnapshot[field]) !== parseFloat(oldSnapshot[field])) {
+        await supabaseAdmin.from('financial_audit_log').insert({
+          tenant_id: tenantId,
+          entity_type: entityType,
+          entity_id: entityId,
+          field_changed: field,
+          old_value: oldSnapshot[field],
+          new_value: newSnapshot[field],
+          snapshot_before: oldSnapshot,
+          snapshot_after: newSnapshot,
+          changed_by: userId
+        });
+      }
+    }
   }
 }
 

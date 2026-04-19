@@ -57,12 +57,12 @@ export const ItineraryBuilderPage: React.FC = () => {
   const { 
     itinerary, isLoading, isSaving, 
     addDay, updateDay, deleteDay, reorderDays,
-    updateItem, deleteItem, reorderItemsInDay, 
+    addItem, updateItem, deleteItem, reorderItemsInDay, 
     toggleShare, updateItinerary, loadFromTemplate, refreshItinerary
   } = useItinerary(id!);
 
   const { user } = useAuth();
-  const isAdmin = user?.role === 'admin' || user?.role === 'super_admin';
+  const isAdmin = ['admin', 'agency_admin', 'super_admin'].includes(user?.role || '');
 
   const [activeDayId, setActiveDayId] = useState<string | null>(null);
   const [showTemplatePicker, setShowTemplatePicker] = useState(false);

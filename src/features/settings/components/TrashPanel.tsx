@@ -3,7 +3,7 @@ import {
   Trash2, RotateCcw, Flame, RefreshCw, ChevronDown, 
   ChevronUp, CheckSquare, Square, ShieldAlert,
   UserPlus, Receipt, FileText, Building2, Truck, Percent, File,
-  Zap, AlertCircle, Info, Trash
+  Zap, AlertCircle, Info, Trash, Clock
 } from 'lucide-react';
 import { useTrash } from '../hooks/useTrash';
 import { timeAgo } from '@/utils/time';
